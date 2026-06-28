@@ -184,7 +184,15 @@ Get more models from https://ggml.ggerganov.com/ and [HuggingFace](https://huggi
 
 ### Linux (Fedora / Nobara — tested ✅)
 
-#### 1. Check what you have
+#### 1. Clone the repo into a new folder
+
+```sh
+mkdir ~/bosscat-build && cd ~/bosscat-build
+git clone https://github.com/unclescunter/BOSSCAT-localvocal.git
+cd BOSSCAT-localvocal
+```
+
+#### 2. Check what you have
 
 ```sh
 which ninja cmake gcc g++ ccache || echo "some tools missing"
@@ -192,7 +200,7 @@ pkg-config --exists Qt6Core && echo "Qt6 OK" || echo "MISSING: Qt6"
 rpm -q obs-studio-devel || echo "MISSING: obs-studio-devel"
 ```
 
-#### 2. Install dependencies
+#### 3. Install dependencies
 
 ```sh
 sudo dnf install -y cmake ninja-build ccache gcc gcc-c++ git \
@@ -204,42 +212,39 @@ sudo dnf install -y cmake ninja-build ccache gcc gcc-c++ git \
   cargo rust
 ```
 
-#### 3. Choose your GPU acceleration
+#### 4. Set your GPU acceleration
 
-Set `ACCELERATION` before building. This is the single most important choice:
+Set `ACCELERATION` to match your GPU — this is the most important choice:
 
 | Value | Use when | Benefit |
 |---|---|---|
 | `amd` | AMD GPU with ROCm installed | hipBLAS/ROCm GPU acceleration — significantly faster inference |
 | `nvidia` | NVIDIA GPU with CUDA installed | CUDA GPU acceleration |
-| `generic` | No GPU, unsupported GPU, or unsure | CPU + OpenBLAS + Vulkan/OpenCL — works everywhere, no GPU required |
+| `generic` | No discrete GPU, unsupported GPU, or unsure | CPU + OpenBLAS + Vulkan/OpenCL — works everywhere |
 
 ```sh
 export ACCELERATION=amd    # change to nvidia or generic as needed
 ```
 
-#### 4. Build
+#### 5. Build
 
-These three flags are all **required** — the build will fail without them:
+All four of these are **required** — the build will fail if any are missing:
 
 ```sh
-git clone https://github.com/unclescunter/BOSSCAT-localvocal.git
-cd BOSSCAT-localvocal
-
-export ACCELERATION=amd
+export ACCELERATION=amd          # nvidia or generic — set above
 export CFLAGS="-fPIC"
 export CXXFLAGS="-fPIC"
 
-rm -rf build_x86_64   # clean slate if rebuilding
 cmake -B build_x86_64 --preset linux-x86_64 \
       -DCMAKE_INSTALL_PREFIX=./release \
       -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+
 cmake --build build_x86_64 --target install
 ```
 
-> Why `-fPIC` and `-DCMAKE_POSITION_INDEPENDENT_CODE=ON`? Several sub-dependencies (cpu_features, Whisper.cpp) build as static libraries that get linked into a shared `.so`. Without position-independent code the linker fails at the very last step with a `relocation R_X86_64_32` error. The env vars ensure the flag propagates into every sub-build.
+> **Why `-fPIC` and `-DCMAKE_POSITION_INDEPENDENT_CODE=ON`?** Sub-dependencies (cpu_features, Whisper.cpp) build as static libraries linked into the final shared `.so`. Without position-independent code the linker fails at the last step with `relocation R_X86_64_32 ... recompile with -fPIC`. The env vars ensure the flag propagates into every sub-build that CMake spawns.
 
-#### 5. Install to OBS
+#### 6. Install to OBS
 
 ```sh
 mkdir -p ~/.config/obs-studio/plugins/obs-localvocal/bin/64bit
@@ -247,10 +252,34 @@ mkdir -p ~/.config/obs-studio/plugins/obs-localvocal/data
 
 cp release/lib64/obs-plugins/obs-localvocal.so \
    ~/.config/obs-studio/plugins/obs-localvocal/bin/64bit/
-cp release/lib64/obs-plugins/obs-localvocal/* \
-   ~/.config/obs-studio/plugins/obs-localvocal/bin/64bit/ 2>/dev/null || true
+
+cp -r release/lib64/obs-plugins/obs-localvocal \
+   ~/.config/obs-studio/plugins/obs-localvocal/bin/64bit/
+
 cp -r release/share/obs/obs-plugins/obs-localvocal/. \
    ~/.config/obs-studio/plugins/obs-localvocal/data/
+```
+
+Or just run the included script from the repo root:
+
+```sh
+./install.sh
+```
+
+The resulting layout should look like:
+```
+~/.config/obs-studio/plugins/obs-localvocal/
+├── bin/64bit/
+│   ├── obs-localvocal.so
+│   └── obs-localvocal/
+│       ├── libggml.so
+│       ├── libggml-hip.so
+│       ├── libwhisper.so.x.x.x
+│       ├── libonnxruntime.so.x.x.x
+│       └── ...
+└── data/
+    ├── locale/
+    └── models/
 ```
 
 Restart OBS. The **BOSSCAT Captions** dock will appear under Docks.

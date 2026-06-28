@@ -16,6 +16,7 @@
 !CMakePresets.json
 !LICENSE
 !README.md
+!install.sh
 !/vendor
 
 # Exclude lock files
@@ -26,3 +27,10 @@
 
 # Exclude CMake build number cache
 /cmake/.CMakeBuildNumber
+
+# Exclude large model weight files
+*.bin
+*.ggml
+*.onnx
+*.pt
+*.gguf
