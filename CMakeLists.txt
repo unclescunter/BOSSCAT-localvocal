@@ -175,6 +175,7 @@ target_sources(
           src/whisper-utils/token-buffer-thread.cpp
           src/whisper-utils/remote-whisper.cpp
           src/whisper-utils/vad-processing.cpp
+          src/caption-dock.cpp
           src/translation/language_codes.cpp
           src/translation/translation.cpp
           src/translation/translation-utils.cpp

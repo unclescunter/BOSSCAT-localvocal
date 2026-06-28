@@ -36,6 +36,7 @@
 #include "translation/translation-includes.h"
 #include "ui/filter-replace-dialog.h"
 #include "ui/filter-replace-utils.h"
+#include "caption-dock.h"
 
 void set_source_signals(transcription_filter_data *gf, obs_source_t *parent_source)
 {
@@ -289,6 +290,7 @@ void transcription_filter_destroy(void *data)
 	signal_handler_disconnect(sh_filter, "enable", enable_callback, gf);
 
 	obs_log(gf->log_level, "filter destroy");
+	caption_registry_remove(gf); // BOSSCAT Layer 6
 	teardown_mix_sources(gf); // BOSSCAT Layer 3
 	shutdown_whisper_thread(gf);
 
@@ -874,6 +876,14 @@ void *transcription_filter_create(obs_data_t *settings, obs_source_t *filter)
 	// to match the subtitles with the recording
 	obs_frontend_add_event_callback(recording_state_callback, gf);
 
+	// BOSSCAT Layer 6 — register with caption dock.
+	{
+		obs_source_t *parent = obs_filter_get_parent(gf->context);
+		std::string host_name =
+			parent ? std::string(obs_source_get_name(parent)) : "";
+		caption_registry_add(gf, host_name);
+	}
+
 	obs_log(gf->log_level, "filter created.");
 	return gf;
 }
@@ -928,4 +938,15 @@ void load_packet_callback_functions()
 		reinterpret_cast<obs_output_remove_packet_callback_t *>(remove_callback);
 
 	obs_log(LOG_INFO, "loaded callbacks");
+}
+
+// BOSSCAT Layer 6 — called from obs_module_load (via plugin-main.c extern).
+extern "C" void bosscat_module_load()
+{
+	caption_dock_init();
+}
+
+extern "C" void bosscat_module_unload()
+{
+	caption_dock_shutdown();
 }
