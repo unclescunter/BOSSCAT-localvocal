@@ -176,7 +176,117 @@ If using CoreML on Apple, it will also automatically download the appropriate Co
 
 Get more models from https://ggml.ggerganov.com/ and [HuggingFace](https://huggingface.co/ggerganov/whisper.cpp/tree/main), follow [the instructions on whisper.cpp](https://github.com/ggerganov/whisper.cpp/tree/master/models) to create your own models or download others such as distilled models.
 
-## Building
+## BOSSCAT Build Instructions
+
+> **AI Notice:** The majority of the BOSSCAT feature layers in this fork were written with the assistance of Claude (Anthropic). The code has been reviewed and tested, but you build and run it entirely at your own risk. No warranty is provided.
+
+### Step 1 — Choose your acceleration
+
+Set the `ACCELERATION` environment variable before building. Pick the one that matches your GPU:
+
+| Value | Hardware | Benefit |
+|---|---|---|
+| `nvidia` | NVIDIA GPU (GTX/RTX series) | CUDA acceleration — fastest inference on supported NVIDIA GPUs |
+| `amd` | AMD GPU (RX series, with ROCm) | hipBLAS/ROCm acceleration — GPU-accelerated inference on supported AMD GPUs |
+| `generic` | No discrete GPU, or unsupported GPU | CPU-only + OpenBLAS + Vulkan/OpenCL fallback — works everywhere |
+
+```sh
+# Pick ONE of these:
+export ACCELERATION="nvidia"
+export ACCELERATION="amd"
+export ACCELERATION="generic"
+```
+
+If you are unsure, use `generic`. The plugin will still use OpenBLAS and Vulkan for acceleration where available.
+
+---
+
+### Linux
+
+**Prerequisites:** CMake 3.28+, a C++17 compiler, Rust (via [rustup](https://rustup.rs)), and the following libraries via your package manager:
+
+```sh
+# Fedora / Nobara
+sudo dnf install cmake ninja-build libcurl-devel openssl-devel openblas-devel \
+                 opencl-headers ocl-icd-devel vulkan-devel qt6-qtbase-devel rust cargo
+
+# Ubuntu / Debian
+sudo apt install cmake ninja-build libcurl4-openssl-dev libssl-dev libopenblas-dev \
+                 opencl-headers ocl-icd-opencl-dev libvulkan-dev qt6-base-dev rustup
+```
+
+**Build:**
+
+```sh
+git clone https://github.com/unclescunter/BOSSCAT-localvocal.git
+cd BOSSCAT-localvocal
+
+export ACCELERATION="amd"          # or nvidia / generic
+export CFLAGS="-fPIC"
+export CXXFLAGS="-fPIC"
+
+cmake -B build_x86_64 --preset linux-x86_64 \
+      -DCMAKE_INSTALL_PREFIX=./release \
+      -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+
+cmake --build build_x86_64 --config Release -j$(nproc)
+cmake --install build_x86_64 --config Release
+```
+
+> The `-fPIC` flags and `-DCMAKE_POSITION_INDEPENDENT_CODE=ON` are **required** on Linux — the build will fail without them.
+
+**Install to OBS:**
+
+```sh
+mkdir -p ~/.config/obs-studio/plugins/obs-localvocal/bin/64bit
+mkdir -p ~/.config/obs-studio/plugins/obs-localvocal/data
+
+cp release/lib64/obs-plugins/obs-localvocal.so \
+   ~/.config/obs-studio/plugins/obs-localvocal/bin/64bit/
+cp release/lib64/obs-plugins/obs-localvocal/* \
+   ~/.config/obs-studio/plugins/obs-localvocal/bin/64bit/
+cp -r release/share/obs/obs-plugins/obs-localvocal/. \
+   ~/.config/obs-studio/plugins/obs-localvocal/data/
+```
+
+Restart OBS. The **BOSSCAT Captions** dock will appear under the Docks menu.
+
+---
+
+### macOS
+
+```sh
+git clone https://github.com/unclescunter/BOSSCAT-localvocal.git
+cd BOSSCAT-localvocal
+
+export ACCELERATION="generic"      # macOS uses Metal; generic is the right choice here
+MACOS_ARCH="arm64" ./.github/scripts/build-macos -c Release   # or x86_64 for Intel
+```
+
+Copy the resulting `.plugin` bundle to OBS:
+
+```sh
+cp -R release/Release/obs-localvocal.plugin \
+      ~/Library/Application\ Support/obs-studio/plugins/
+```
+
+---
+
+### Windows
+
+Open a PowerShell terminal in the repo directory:
+
+```powershell
+$env:ACCELERATION = "nvidia"    # or "amd" / "generic"
+.github/scripts/Build-Windows.ps1 -Configuration Release
+Copy-Item -Recurse -Force "release\Release\*" -Destination "C:\Program Files\obs-studio\"
+```
+
+---
+
+## Upstream Build Instructions
+
+The original obs-localvocal build documentation follows below for reference.
 
 The plugin was built and tested on Mac OSX (Intel & Apple silicon), Windows (with and without Nvidia CUDA) and Linux.
 
