@@ -225,6 +225,17 @@ struct transcription_filter_data {
 	std::string caption_label_text;
 	bool caption_label_enabled = false;
 
+	// BOSSCAT Layer 5 — sentence-buffered file output + SRT-per-recording
+	bool save_txt = false;        // independently toggle .txt output
+	std::string txt_file_path;    // path for .txt output
+	std::string srt_file_path;    // path for standalone .srt output
+	bool auto_srt_with_recording = false;
+	std::string auto_srt_file_path;   // active auto-SRT path (temp during recording)
+	uint64_t recording_start_ts = 0;  // ms, set on recording start for zeroed SRT timecodes
+	size_t auto_srt_sentence_number = 1;
+	std::string sentence_context_buffer; // pending text waiting for sentence boundary
+	int file_context_words = 50;
+
 	// BOSSCAT Layer 4 — remote whisper.cpp server
 	bool use_remote_whisper = false;
 	std::string whisper_server_host = "127.0.0.1";

@@ -471,6 +471,16 @@ void add_file_output_group_properties(obs_properties_t *ppts)
 				MT_("only_while_recording"));
 	obs_properties_add_bool(file_output_group, "rename_file_to_match_recording",
 				MT_("rename_file_to_match_recording"));
+	// BOSSCAT Layer 5 — sentence-buffered and per-recording SRT
+	obs_properties_add_bool(file_output_group, "save_txt", MT_("save_txt"));
+	obs_properties_add_path(file_output_group, "txt_file_path", MT_("txt_file_path"),
+				OBS_PATH_FILE_SAVE, "Text (*.txt)", NULL);
+	obs_properties_add_path(file_output_group, "srt_file_path", MT_("srt_file_path"),
+				OBS_PATH_FILE_SAVE, "SRT (*.srt)", NULL);
+	obs_properties_add_bool(file_output_group, "auto_srt_with_recording",
+				MT_("auto_srt_with_recording"));
+	obs_properties_add_int_slider(file_output_group, "file_context_words",
+				      MT_("file_context_words"), 5, 200, 5);
 	obs_property_set_modified_callback(file_output_group_prop, file_output_select_changed);
 }
 
@@ -705,6 +715,12 @@ void transcription_filter_defaults(obs_data_t *s)
 	obs_data_set_default_int(s, "buffer_num_chars_per_line", 35);
 	obs_data_set_default_int(s, "buffer_output_type",
 				 (int)TokenBufferSegmentation::SEGMENTATION_WORD);
+	// BOSSCAT Layer 5 defaults
+	obs_data_set_default_bool(s, "save_txt", false);
+	obs_data_set_default_string(s, "txt_file_path", "");
+	obs_data_set_default_string(s, "srt_file_path", "");
+	obs_data_set_default_bool(s, "auto_srt_with_recording", false);
+	obs_data_set_default_int(s, "file_context_words", 50);
 	// BOSSCAT Layer 2 defaults
 	obs_data_set_default_string(s, "mix_extra_sources", ""); // Layer 3
 	obs_data_set_default_bool(s, "use_remote_whisper", false); // Layer 4

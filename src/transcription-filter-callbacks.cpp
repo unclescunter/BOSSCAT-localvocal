@@ -328,10 +328,86 @@ void output_text(struct transcription_filter_data *gf, const DetectionResultWith
 			}
 		}
 
-		if (gf->save_to_file && gf->output_file_path != "" &&
-		    result.result == DETECTION_RESULT_SPEECH) {
-			obs_log(LOG_DEBUG, "-- file output -- %s", text.c_str());
-			send_sentence_to_file(gf, result, text, gf->output_file_path, true);
+		// BOSSCAT Layer 5 — sentence-buffered file output.
+		// Only finalized (non-partial) speech results are written to file.
+		if (result.result == DETECTION_RESULT_SPEECH &&
+		    result.result != DETECTION_RESULT_PARTIAL &&
+		    translation_type == NO_TRANSLATION) {
+			// Append to the sentence context buffer.
+			if (!text.empty()) {
+				if (!gf->sentence_context_buffer.empty())
+					gf->sentence_context_buffer += " ";
+				gf->sentence_context_buffer += text;
+			}
+
+			// Flush complete sentences when ending punctuation is found.
+			const std::string &buf = gf->sentence_context_buffer;
+			size_t flush_up_to = std::string::npos;
+			for (size_t i = 0; i < buf.size(); i++) {
+				char c = buf[i];
+				if (c == '.' || c == '?' || c == '!') {
+					// Guard: next char is space/end.
+					if (i + 1 >= buf.size() || buf[i + 1] == ' ')
+						flush_up_to = i + 1;
+				}
+			}
+
+			if (flush_up_to != std::string::npos) {
+				std::string to_flush = buf.substr(0, flush_up_to);
+				// Keep trailing partial sentence in the buffer.
+				size_t remainder = buf.find_first_not_of(" ", flush_up_to);
+				gf->sentence_context_buffer =
+					(remainder != std::string::npos) ? buf.substr(remainder) : "";
+
+				// Write to .txt file.
+				if (gf->save_txt && !gf->txt_file_path.empty()) {
+					obs_log(gf->log_level, "-- txt file output -- %s",
+						to_flush.c_str());
+					gf->save_srt = false; // ensure txt mode
+					send_sentence_to_file(gf, result, to_flush,
+							      gf->txt_file_path, false);
+				} else if (gf->save_to_file && !gf->output_file_path.empty() &&
+					   !gf->save_srt) {
+					send_sentence_to_file(gf, result, to_flush,
+							      gf->output_file_path, true);
+				}
+
+				// Write to standalone .srt file.
+				if (!gf->srt_file_path.empty() && gf->save_srt) {
+					send_sentence_to_file(gf, result, to_flush,
+							      gf->srt_file_path, true);
+				} else if (gf->save_to_file && !gf->output_file_path.empty() &&
+					   gf->save_srt) {
+					send_sentence_to_file(gf, result, to_flush,
+							      gf->output_file_path, true);
+				}
+
+				// Write to auto-SRT if recording and enabled.
+				if (gf->auto_srt_with_recording &&
+				    !gf->auto_srt_file_path.empty() &&
+				    obs_frontend_recording_active()) {
+					// Zero timecodes to recording start.
+					DetectionResultWithText rec_result = result;
+					uint64_t base = gf->recording_start_ts;
+					rec_result.start_timestamp_ms =
+						result.start_timestamp_ms > base
+							? result.start_timestamp_ms - base
+							: 0;
+					rec_result.end_timestamp_ms =
+						result.end_timestamp_ms > base
+							? result.end_timestamp_ms - base
+							: 0;
+					bool was_srt = gf->save_srt;
+					size_t was_num = gf->sentence_number;
+					gf->save_srt = true;
+					gf->sentence_number = gf->auto_srt_sentence_number;
+					send_sentence_to_file(gf, rec_result, to_flush,
+							      gf->auto_srt_file_path, true);
+					gf->auto_srt_sentence_number = gf->sentence_number;
+					gf->sentence_number = was_num;
+					gf->save_srt = was_srt;
+				}
+			}
 		}
 #ifdef ENABLE_WEBVTT
 		if (result.result == DETECTION_RESULT_SPEECH) {
@@ -676,12 +752,57 @@ void recording_state_callback(enum obs_frontend_event event, void *data)
 			gf_->sentence_number = 1;
 			gf_->start_timestamp_ms = now_ms();
 		}
+
+		// BOSSCAT Layer 5 — auto-SRT per recording.
+		if (gf_->auto_srt_with_recording) {
+			gf_->recording_start_ts = now_ms();
+			gf_->auto_srt_sentence_number = 1;
+			gf_->sentence_context_buffer.clear();
+			// Use a temp path next to the configured output or in /tmp.
+			std::string base = gf_->output_file_path;
+			if (base.empty())
+				base = "/tmp/bosscat-localvocal-rec";
+			// Strip extension and add _rec_<ts>.srt
+			auto dot = base.rfind('.');
+			std::string stem = (dot != std::string::npos) ? base.substr(0, dot) : base;
+			gf_->auto_srt_file_path =
+				stem + "_rec_" + std::to_string(gf_->recording_start_ts) + ".srt";
+			obs_log(gf_->log_level, "auto_srt: opening %s",
+				gf_->auto_srt_file_path.c_str());
+			// Truncate/create the file.
+			std::ofstream f(gf_->auto_srt_file_path,
+					std::ios::out | std::ios::trunc);
+			f.close();
+		}
 	} else if (event == OBS_FRONTEND_EVENT_RECORDING_STOPPING) {
 #ifdef ENABLE_WEBVTT
 		remove_webvtt_output(*gf_,
 				     OBSOutputAutoRelease{obs_frontend_get_recording_output()});
 #endif
 	} else if (event == OBS_FRONTEND_EVENT_RECORDING_STOPPED) {
+		// BOSSCAT Layer 5 — rename auto-SRT to match the final recording filename.
+		if (gf_->auto_srt_with_recording && !gf_->auto_srt_file_path.empty()) {
+			namespace fs = std::filesystem;
+			char *recFile = obs_frontend_get_last_recording();
+			if (recFile && strlen(recFile) > 0) {
+				fs::path recPath(recFile);
+				fs::path srtDest = recPath.parent_path() /
+						   (recPath.stem().string() + ".srt");
+				try {
+					if (fs::exists(gf_->auto_srt_file_path)) {
+						fs::rename(gf_->auto_srt_file_path, srtDest);
+						obs_log(gf_->log_level, "auto_srt: renamed to %s",
+							srtDest.c_str());
+					}
+				} catch (const fs::filesystem_error &e) {
+					obs_log(LOG_ERROR, "auto_srt rename error: %s", e.what());
+				}
+			}
+			if (recFile)
+				bfree(recFile);
+			gf_->auto_srt_file_path.clear();
+		}
+
 		if (!gf_->save_only_while_recording || !gf_->rename_file_to_match_recording) {
 			return;
 		}
