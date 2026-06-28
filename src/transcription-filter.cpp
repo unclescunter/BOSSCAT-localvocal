@@ -10,6 +10,7 @@
 #include <iomanip>
 #include <bitset>
 #include <regex>
+#include <vector>
 #ifdef _WIN32
 #define NOMINMAX
 #include <Windows.h>
@@ -113,6 +114,62 @@ void enumerate_gpu_devices(transcription_filter_data *gf)
 	};
 }
 
+// BOSSCAT Layer 3 — audio capture callback for extra mixed sources.
+static void extra_source_audio_cb(void *param, obs_source_t * /*source*/,
+				  const struct audio_data *audio, bool muted)
+{
+	using ExtraSourceAudio = transcription_filter_data::ExtraSourceAudio;
+	auto *esa = static_cast<ExtraSourceAudio *>(param);
+	if (!audio || muted || esa->channels == 0)
+		return;
+
+	std::lock_guard<std::mutex> lock(esa->buf_mutex);
+	for (size_t c = 0; c < esa->channels && c < MAX_PREPROC_CHANNELS; c++) {
+		const float *src = reinterpret_cast<const float *>(audio->data[c]);
+		if (src) {
+			for (uint32_t f = 0; f < audio->frames; f++)
+				esa->ch[c].push_back(src[f]);
+		}
+	}
+}
+
+// Tear down extra-source mix capture callbacks.
+static void teardown_mix_sources(transcription_filter_data *gf)
+{
+	using ExtraSourceAudio = transcription_filter_data::ExtraSourceAudio;
+	for (auto &esa : gf->mix_extra_sources) {
+		if (esa && esa->source) {
+			obs_source_remove_audio_capture_callback(
+				esa->source, extra_source_audio_cb, esa.get());
+			obs_source_release(esa->source);
+			esa->source = nullptr;
+		}
+	}
+	gf->mix_extra_sources.clear();
+}
+
+// Set up capture callbacks for named extra sources.
+static void setup_mix_sources(transcription_filter_data *gf)
+{
+	using ExtraSourceAudio = transcription_filter_data::ExtraSourceAudio;
+	teardown_mix_sources(gf);
+	for (const auto &name : gf->mix_extra_source_names) {
+		if (name.empty())
+			continue;
+		obs_source_t *src = obs_get_source_by_name(name.c_str());
+		if (!src) {
+			obs_log(LOG_WARNING, "mix_extra_source '%s' not found", name.c_str());
+			continue;
+		}
+		auto esa = std::make_shared<ExtraSourceAudio>();
+		esa->source = src; // takes the reference returned by obs_get_source_by_name
+		esa->channels = gf->channels;
+		esa->sample_rate = gf->sample_rate;
+		obs_source_add_audio_capture_callback(src, extra_source_audio_cb, esa.get());
+		gf->mix_extra_sources.push_back(std::move(esa));
+	}
+}
+
 struct obs_audio_data *transcription_filter_filter_audio(void *data, struct obs_audio_data *audio)
 {
 	if (!audio) {
@@ -157,11 +214,38 @@ struct obs_audio_data *transcription_filter_filter_audio(void *data, struct obs_
 
 	{
 		std::lock_guard<std::mutex> lock(gf->whisper_buf_mutex); // scoped lock
-		// push back current audio data to input deque
+
+		// BOSSCAT Layer 3: sum extra-source audio into the input buffers.
+		// We mix into a temporary float array to keep the main deque_push_back simple.
+		std::vector<std::vector<float>> mixed(gf->channels,
+						      std::vector<float>(audio->frames, 0.0f));
+
+		// Copy main source into mix buffer.
 		for (size_t c = 0; c < gf->channels; c++) {
-			deque_push_back(&gf->input_buffers[c], audio->data[c],
+			const float *src = reinterpret_cast<const float *>(audio->data[c]);
+			for (uint32_t f = 0; f < audio->frames; f++)
+				mixed[c][f] = src ? src[f] : 0.0f;
+		}
+
+		// Add extra sources.
+		for (auto &esa : gf->mix_extra_sources) {
+			std::lock_guard<std::mutex> elock(esa->buf_mutex);
+			for (size_t c = 0; c < gf->channels && c < MAX_PREPROC_CHANNELS; c++) {
+				for (uint32_t f = 0; f < audio->frames; f++) {
+					if (!esa->ch[c].empty()) {
+						mixed[c][f] += esa->ch[c].front();
+						esa->ch[c].pop_front();
+					}
+				}
+			}
+		}
+
+		// Push mixed audio into input deques.
+		for (size_t c = 0; c < gf->channels; c++) {
+			deque_push_back(&gf->input_buffers[c], mixed[c].data(),
 					audio->frames * sizeof(float));
 		}
+
 		// push audio packet info (timestamp/frame count) to info deque
 		struct transcription_filter_audio_info info = {0};
 		info.frames = audio->frames; // number of frames in this packet
@@ -205,6 +289,7 @@ void transcription_filter_destroy(void *data)
 	signal_handler_disconnect(sh_filter, "enable", enable_callback, gf);
 
 	obs_log(gf->log_level, "filter destroy");
+	teardown_mix_sources(gf); // BOSSCAT Layer 3
 	shutdown_whisper_thread(gf);
 
 	if (gf->resampler_to_whisper) {
@@ -323,6 +408,29 @@ void transcription_filter_update(void *data, obs_data_t *s)
 	gf->segment_duration = (int)obs_data_get_int(s, "segment_duration");
 	gf->partial_transcription = obs_data_get_bool(s, "partial_group");
 	gf->partial_latency = (int)obs_data_get_int(s, "partial_latency");
+
+	// BOSSCAT Layer 3 — parse comma-separated extra source names and set up capture.
+	{
+		const char *raw = obs_data_get_string(s, "mix_extra_sources");
+		std::vector<std::string> names;
+		if (raw && strlen(raw) > 0) {
+			std::string raw_str(raw);
+			std::istringstream iss(raw_str);
+			std::string tok;
+			while (std::getline(iss, tok, ',')) {
+				// trim whitespace
+				size_t p0 = tok.find_first_not_of(" \t");
+				size_t p1 = tok.find_last_not_of(" \t");
+				if (p0 != std::string::npos)
+					names.push_back(tok.substr(p0, p1 - p0 + 1));
+			}
+		}
+		if (names != gf->mix_extra_source_names) {
+			gf->mix_extra_source_names = names;
+			setup_mix_sources(gf);
+		}
+	}
+
 	bool new_buffered_output = obs_data_get_bool(s, "buffered_output");
 	int new_buffer_num_lines = (int)obs_data_get_int(s, "caption_max_lines");
 	int new_buffer_num_chars_per_line = (int)obs_data_get_int(s, "caption_soft_target");

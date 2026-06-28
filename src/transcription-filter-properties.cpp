@@ -664,6 +664,13 @@ obs_properties_t *transcription_filter_properties(void *data)
 #endif
 	add_file_output_group_properties(ppts);
 	add_buffered_output_group_properties(ppts);
+
+	// BOSSCAT Layer 3 — multi-source mix
+	obs_properties_t *mix_group = obs_properties_create();
+	obs_properties_add_group(ppts, "mix_group", MT_("mix_group"), OBS_GROUP_NORMAL, mix_group);
+	obs_properties_add_text(mix_group, "mix_extra_sources", MT_("mix_extra_sources"),
+				OBS_TEXT_DEFAULT);
+
 	add_advanced_group_properties(ppts, gf);
 	add_logging_group_properties(ppts);
 	add_partial_group_properties(ppts);
@@ -689,6 +696,7 @@ void transcription_filter_defaults(obs_data_t *s)
 	obs_data_set_default_int(s, "buffer_output_type",
 				 (int)TokenBufferSegmentation::SEGMENTATION_WORD);
 	// BOSSCAT Layer 2 defaults
+	obs_data_set_default_string(s, "mix_extra_sources", ""); // Layer 3
 	obs_data_set_default_int(s, "caption_soft_target", 35);
 	obs_data_set_default_int(s, "caption_max_lines", 2);
 	obs_data_set_default_int(s, "caption_decay_seconds", 3);

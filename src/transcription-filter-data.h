@@ -18,6 +18,8 @@
 #include <condition_variable>
 #include <functional>
 #include <string>
+#include <deque>
+#include <vector>
 
 #include "translation/translation.h"
 #include "translation/translation-includes.h"
@@ -222,6 +224,19 @@ struct transcription_filter_data {
 	int caption_decay_seconds = 3;
 	std::string caption_label_text;
 	bool caption_label_enabled = false;
+
+	// BOSSCAT Layer 3 — multi-source audio mix
+	// Ring buffer for one extra source (one per source in mix_extra_sources).
+	struct ExtraSourceAudio {
+		obs_source_t *source = nullptr;
+		std::mutex buf_mutex;
+		// Per-channel sample ring-buffers (float, native OBS sample rate).
+		std::deque<float> ch[MAX_PREPROC_CHANNELS];
+		uint32_t sample_rate = 0;
+		size_t channels = 0;
+	};
+	std::vector<std::string> mix_extra_source_names;
+	std::vector<std::shared_ptr<ExtraSourceAudio>> mix_extra_sources;
 
 #ifdef ENABLE_WEBVTT
 	enum struct webvtt_output_type {
