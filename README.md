@@ -178,64 +178,68 @@ Get more models from https://ggml.ggerganov.com/ and [HuggingFace](https://huggi
 
 ## BOSSCAT Build Instructions
 
-> **AI Notice:** The majority of the BOSSCAT feature layers in this fork were written with the assistance of Claude (Anthropic). The code has been reviewed and tested, but you build and run it entirely at your own risk. No warranty is provided.
-
-### Step 1 — Choose your acceleration
-
-Set the `ACCELERATION` environment variable before building. Pick the one that matches your GPU:
-
-| Value | Hardware | Benefit |
-|---|---|---|
-| `nvidia` | NVIDIA GPU (GTX/RTX series) | CUDA acceleration — fastest inference on supported NVIDIA GPUs |
-| `amd` | AMD GPU (RX series, with ROCm) | hipBLAS/ROCm acceleration — GPU-accelerated inference on supported AMD GPUs |
-| `generic` | No discrete GPU, or unsupported GPU | CPU-only + OpenBLAS + Vulkan/OpenCL fallback — works everywhere |
-
-```sh
-# Pick ONE of these:
-export ACCELERATION="nvidia"
-export ACCELERATION="amd"
-export ACCELERATION="generic"
-```
-
-If you are unsure, use `generic`. The plugin will still use OpenBLAS and Vulkan for acceleration where available.
+> **Important:** The BOSSCAT feature layers in this fork were written with the assistance of [Claude](https://claude.ai) (Anthropic AI). The code has been tested **only on Fedora/Nobara Linux with an AMD GPU (ROCm)**. All other platforms are untested. You build and run this entirely at your own risk — no warranty is provided.
 
 ---
 
-### Linux
+### Linux (Fedora / Nobara — tested ✅)
 
-**Prerequisites:** CMake 3.28+, a C++17 compiler, Rust (via [rustup](https://rustup.rs)), and the following libraries via your package manager:
+#### 1. Check what you have
 
 ```sh
-# Fedora / Nobara
-sudo dnf install cmake ninja-build libcurl-devel openssl-devel openblas-devel \
-                 opencl-headers ocl-icd-devel vulkan-devel qt6-qtbase-devel rust cargo
-
-# Ubuntu / Debian
-sudo apt install cmake ninja-build libcurl4-openssl-dev libssl-dev libopenblas-dev \
-                 opencl-headers ocl-icd-opencl-dev libvulkan-dev qt6-base-dev rustup
+which ninja cmake gcc g++ ccache || echo "some tools missing"
+pkg-config --exists Qt6Core && echo "Qt6 OK" || echo "MISSING: Qt6"
+rpm -q obs-studio-devel || echo "MISSING: obs-studio-devel"
 ```
 
-**Build:**
+#### 2. Install dependencies
+
+```sh
+sudo dnf install -y cmake ninja-build ccache gcc gcc-c++ git \
+  qt6-qtbase-devel qt6-qtbase-private-devel qt6-qtsvg-devel \
+  libcurl-devel libicu-devel pkgconf-pkg-config mbedtls-devel \
+  obs-studio-devel blas-devel lapack-devel openblas-devel \
+  glslang ocl-icd-devel opencl-headers \
+  rocm-runtime rocm-hip-devel rocm-opencl-devel rocwmma-devel \
+  cargo rust
+```
+
+#### 3. Choose your GPU acceleration
+
+Set `ACCELERATION` before building. This is the single most important choice:
+
+| Value | Use when | Benefit |
+|---|---|---|
+| `amd` | AMD GPU with ROCm installed | hipBLAS/ROCm GPU acceleration — significantly faster inference |
+| `nvidia` | NVIDIA GPU with CUDA installed | CUDA GPU acceleration |
+| `generic` | No GPU, unsupported GPU, or unsure | CPU + OpenBLAS + Vulkan/OpenCL — works everywhere, no GPU required |
+
+```sh
+export ACCELERATION=amd    # change to nvidia or generic as needed
+```
+
+#### 4. Build
+
+These three flags are all **required** — the build will fail without them:
 
 ```sh
 git clone https://github.com/unclescunter/BOSSCAT-localvocal.git
 cd BOSSCAT-localvocal
 
-export ACCELERATION="amd"          # or nvidia / generic
+export ACCELERATION=amd
 export CFLAGS="-fPIC"
 export CXXFLAGS="-fPIC"
 
+rm -rf build_x86_64   # clean slate if rebuilding
 cmake -B build_x86_64 --preset linux-x86_64 \
       -DCMAKE_INSTALL_PREFIX=./release \
       -DCMAKE_POSITION_INDEPENDENT_CODE=ON
-
-cmake --build build_x86_64 --config Release -j$(nproc)
-cmake --install build_x86_64 --config Release
+cmake --build build_x86_64 --target install
 ```
 
-> The `-fPIC` flags and `-DCMAKE_POSITION_INDEPENDENT_CODE=ON` are **required** on Linux — the build will fail without them.
+> Why `-fPIC` and `-DCMAKE_POSITION_INDEPENDENT_CODE=ON`? Several sub-dependencies (cpu_features, Whisper.cpp) build as static libraries that get linked into a shared `.so`. Without position-independent code the linker fails at the very last step with a `relocation R_X86_64_32` error. The env vars ensure the flag propagates into every sub-build.
 
-**Install to OBS:**
+#### 5. Install to OBS
 
 ```sh
 mkdir -p ~/.config/obs-studio/plugins/obs-localvocal/bin/64bit
@@ -244,43 +248,45 @@ mkdir -p ~/.config/obs-studio/plugins/obs-localvocal/data
 cp release/lib64/obs-plugins/obs-localvocal.so \
    ~/.config/obs-studio/plugins/obs-localvocal/bin/64bit/
 cp release/lib64/obs-plugins/obs-localvocal/* \
-   ~/.config/obs-studio/plugins/obs-localvocal/bin/64bit/
+   ~/.config/obs-studio/plugins/obs-localvocal/bin/64bit/ 2>/dev/null || true
 cp -r release/share/obs/obs-plugins/obs-localvocal/. \
    ~/.config/obs-studio/plugins/obs-localvocal/data/
 ```
 
-Restart OBS. The **BOSSCAT Captions** dock will appear under the Docks menu.
+Restart OBS. The **BOSSCAT Captions** dock will appear under Docks.
 
 ---
 
-### macOS
+### Troubleshooting (Linux)
+
+**OBS says "plugin failed to load" with no detail**
+
+Run OBS from a terminal to see the real error:
 
 ```sh
-git clone https://github.com/unclescunter/BOSSCAT-localvocal.git
-cd BOSSCAT-localvocal
-
-export ACCELERATION="generic"      # macOS uses Metal; generic is the right choice here
-MACOS_ARCH="arm64" ./.github/scripts/build-macos -c Release   # or x86_64 for Intel
+QT_QPA_PLATFORM=xcb obs
 ```
 
-Copy the resulting `.plugin` bundle to OBS:
+**`libamdhip64.so.6: cannot open shared object file`**
+
+Your system has a newer ROCm version (e.g. v7) but the plugin was linked against v6. One symlink fixes it:
 
 ```sh
-cp -R release/Release/obs-localvocal.plugin \
-      ~/Library/Application\ Support/obs-studio/plugins/
+sudo ln -s /usr/lib64/libamdhip64.so.7 /usr/lib64/libamdhip64.so.6
+sudo ldconfig
 ```
+
+Adjust the version numbers to match what you actually have in `/usr/lib64/`.
+
+**`relocation R_X86_64_32 ... recompile with -fPIC`**
+
+You missed one of the required flags. Wipe the build dir and start step 4 again with all three flags set.
 
 ---
 
-### Windows
+### macOS and Windows (untested)
 
-Open a PowerShell terminal in the repo directory:
-
-```powershell
-$env:ACCELERATION = "nvidia"    # or "amd" / "generic"
-.github/scripts/Build-Windows.ps1 -Configuration Release
-Copy-Item -Recurse -Force "release\Release\*" -Destination "C:\Program Files\obs-studio\"
-```
+BOSSCAT has not been tested on macOS or Windows. The upstream obs-localvocal build instructions below should work for the base plugin, but the BOSSCAT-specific layers are untested on those platforms. For `ACCELERATION`, use `generic` on macOS (it uses Metal automatically) and `nvidia` or `generic` on Windows.
 
 ---
 
