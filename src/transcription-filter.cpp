@@ -324,10 +324,25 @@ void transcription_filter_update(void *data, obs_data_t *s)
 	gf->partial_transcription = obs_data_get_bool(s, "partial_group");
 	gf->partial_latency = (int)obs_data_get_int(s, "partial_latency");
 	bool new_buffered_output = obs_data_get_bool(s, "buffered_output");
-	int new_buffer_num_lines = (int)obs_data_get_int(s, "buffer_num_lines");
-	int new_buffer_num_chars_per_line = (int)obs_data_get_int(s, "buffer_num_chars_per_line");
-	TokenBufferSegmentation new_buffer_output_type =
-		(TokenBufferSegmentation)obs_data_get_int(s, "buffer_output_type");
+	int new_buffer_num_lines = (int)obs_data_get_int(s, "caption_max_lines");
+	int new_buffer_num_chars_per_line = (int)obs_data_get_int(s, "caption_soft_target");
+	// Keep legacy keys as fallback if new ones are zero (fresh install of old settings)
+	if (new_buffer_num_lines <= 0)
+		new_buffer_num_lines = (int)obs_data_get_int(s, "buffer_num_lines");
+	if (new_buffer_num_chars_per_line <= 0)
+		new_buffer_num_chars_per_line = (int)obs_data_get_int(s, "buffer_num_chars_per_line");
+	if (new_buffer_num_lines <= 0)
+		new_buffer_num_lines = 2;
+	if (new_buffer_num_chars_per_line <= 0)
+		new_buffer_num_chars_per_line = 35;
+	TokenBufferSegmentation new_buffer_output_type = SEGMENTATION_WORD;
+	int new_caption_decay = (int)obs_data_get_int(s, "caption_decay_seconds");
+	if (new_caption_decay <= 0)
+		new_caption_decay = 3;
+	gf->caption_decay_seconds = new_caption_decay;
+	gf->caption_label_enabled = obs_data_get_bool(s, "caption_label_enabled");
+	const char *lbl = obs_data_get_string(s, "caption_label_text");
+	gf->caption_label_text = (lbl != nullptr) ? lbl : "";
 	const char *filter_words_replace = obs_data_get_string(s, "filter_words_replace");
 	if (filter_words_replace != nullptr && strlen(filter_words_replace) > 0) {
 		obs_log(gf->log_level, "filter_words_replace: %s", filter_words_replace);
@@ -368,7 +383,9 @@ void transcription_filter_update(void *data, obs_data_t *s)
 					}
 				},
 				new_buffer_num_lines, new_buffer_num_chars_per_line,
-				std::chrono::seconds(3), new_buffer_output_type);
+				std::chrono::seconds(new_caption_decay), new_buffer_output_type);
+			gf->captions_monitor.setLabel(gf->caption_label_text,
+						      gf->caption_label_enabled);
 			gf->translation_monitor.initialize(
 				gf,
 				[gf](const std::string &translated_text) {
@@ -382,7 +399,7 @@ void transcription_filter_update(void *data, obs_data_t *s)
 					}
 				},
 				new_buffer_num_lines, new_buffer_num_chars_per_line,
-				std::chrono::seconds(3), new_buffer_output_type);
+				std::chrono::seconds(new_caption_decay), new_buffer_output_type);
 			gf->cloud_translation_monitor.initialize(
 				gf,
 				[gf](const std::string &translated_text) {
@@ -396,7 +413,7 @@ void transcription_filter_update(void *data, obs_data_t *s)
 					}
 				},
 				new_buffer_num_lines, new_buffer_num_chars_per_line,
-				std::chrono::seconds(3), new_buffer_output_type);
+				std::chrono::seconds(new_caption_decay), new_buffer_output_type);
 		} else {
 			if (new_buffer_num_lines != gf->buffered_output_num_lines ||
 			    new_buffer_num_chars_per_line != gf->buffered_output_num_chars ||
@@ -453,6 +470,11 @@ void transcription_filter_update(void *data, obs_data_t *s)
 					});
 			}
 		}
+		// Always update decay and label (they may change independently).
+		gf->captions_monitor.setMaxTime(std::chrono::seconds(new_caption_decay));
+		gf->captions_monitor.setLabel(gf->caption_label_text, gf->caption_label_enabled);
+		gf->translation_monitor.setMaxTime(std::chrono::seconds(new_caption_decay));
+		gf->cloud_translation_monitor.setMaxTime(std::chrono::seconds(new_caption_decay));
 		gf->buffered_output_num_lines = new_buffer_num_lines;
 		gf->buffered_output_num_chars = new_buffer_num_chars_per_line;
 		gf->buffered_output_output_type = new_buffer_output_type;

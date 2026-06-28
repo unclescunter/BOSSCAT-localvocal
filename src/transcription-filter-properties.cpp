@@ -481,43 +481,18 @@ void add_buffered_output_group_properties(obs_properties_t *ppts)
 	obs_properties_add_group(ppts, "buffered_output_group", MT_("buffered_output_parameters"),
 				 OBS_GROUP_NORMAL, buffered_output_group);
 	obs_properties_add_bool(buffered_output_group, "buffered_output", MT_("buffered_output"));
-	// add buffer "type" character or word
-	obs_property_t *buffer_type_list = obs_properties_add_list(
-		buffered_output_group, "buffer_output_type", MT_("buffer_output_type"),
-		OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
-	obs_property_list_add_int(buffer_type_list, "Character", SEGMENTATION_TOKEN);
-	obs_property_list_add_int(buffer_type_list, "Word", SEGMENTATION_WORD);
-	obs_property_list_add_int(buffer_type_list, "Sentence", SEGMENTATION_SENTENCE);
-	// add callback to the segmentation selection to set default values
-	obs_property_set_modified_callback(buffer_type_list, [](obs_properties_t *props,
-								obs_property_t *property,
-								obs_data_t *settings) {
-		UNUSED_PARAMETER(property);
-		UNUSED_PARAMETER(props);
-		const int segmentation_type = (int)obs_data_get_int(settings, "buffer_output_type");
-		// set default values for the number of lines and characters per line
-		switch (segmentation_type) {
-		case SEGMENTATION_TOKEN:
-			obs_data_set_int(settings, "buffer_num_lines", 2);
-			obs_data_set_int(settings, "buffer_num_chars_per_line", 30);
-			break;
-		case SEGMENTATION_WORD:
-			obs_data_set_int(settings, "buffer_num_lines", 2);
-			obs_data_set_int(settings, "buffer_num_chars_per_line", 10);
-			break;
-		case SEGMENTATION_SENTENCE:
-			obs_data_set_int(settings, "buffer_num_lines", 2);
-			obs_data_set_int(settings, "buffer_num_chars_per_line", 2);
-			break;
-		}
-		return true;
-	});
-	// add buffer lines parameter
-	obs_properties_add_int_slider(buffered_output_group, "buffer_num_lines",
-				      MT_("buffer_num_lines"), 1, 5, 1);
-	// add buffer number of characters per line parameter
-	obs_properties_add_int_slider(buffered_output_group, "buffer_num_chars_per_line",
-				      MT_("buffer_num_chars_per_line"), 1, 100, 1);
+
+	// BOSSCAT Layer 2: caption engine settings
+	obs_properties_add_int_slider(buffered_output_group, "caption_soft_target",
+				      MT_("caption_soft_target"), 10, 120, 1);
+	obs_properties_add_int_slider(buffered_output_group, "caption_max_lines",
+				      MT_("caption_max_lines"), 1, 5, 1);
+	obs_properties_add_int_slider(buffered_output_group, "caption_decay_seconds",
+				      MT_("caption_decay_seconds"), 0, 60, 1);
+	obs_properties_add_bool(buffered_output_group, "caption_label_enabled",
+				MT_("caption_label_enabled"));
+	obs_properties_add_text(buffered_output_group, "caption_label_text",
+				MT_("caption_label_text"), OBS_TEXT_DEFAULT);
 }
 
 void add_advanced_group_properties(obs_properties_t *ppts, struct transcription_filter_data *gf)
@@ -710,9 +685,15 @@ void transcription_filter_defaults(obs_data_t *s)
 
 	obs_data_set_default_bool(s, "buffered_output", false);
 	obs_data_set_default_int(s, "buffer_num_lines", 2);
-	obs_data_set_default_int(s, "buffer_num_chars_per_line", 30);
+	obs_data_set_default_int(s, "buffer_num_chars_per_line", 35);
 	obs_data_set_default_int(s, "buffer_output_type",
-				 (int)TokenBufferSegmentation::SEGMENTATION_TOKEN);
+				 (int)TokenBufferSegmentation::SEGMENTATION_WORD);
+	// BOSSCAT Layer 2 defaults
+	obs_data_set_default_int(s, "caption_soft_target", 35);
+	obs_data_set_default_int(s, "caption_max_lines", 2);
+	obs_data_set_default_int(s, "caption_decay_seconds", 3);
+	obs_data_set_default_bool(s, "caption_label_enabled", false);
+	obs_data_set_default_string(s, "caption_label_text", "");
 
 	obs_data_set_default_bool(s, "vad_mode", VAD_MODE_ACTIVE);
 	obs_data_set_default_double(s, "vad_threshold", 0.65);

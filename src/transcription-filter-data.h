@@ -214,9 +214,14 @@ struct transcription_filter_data {
 	TokenBufferThread translation_monitor;
 	TokenBufferThread cloud_translation_monitor;
 	int buffered_output_num_lines = 2;
-	int buffered_output_num_chars = 30;
+	int buffered_output_num_chars = 35;
 	TokenBufferSegmentation buffered_output_output_type =
-		TokenBufferSegmentation::SEGMENTATION_TOKEN;
+		TokenBufferSegmentation::SEGMENTATION_WORD;
+
+	// BOSSCAT Layer 2 — caption engine config
+	int caption_decay_seconds = 3;
+	std::string caption_label_text;
+	bool caption_label_enabled = false;
 
 #ifdef ENABLE_WEBVTT
 	enum struct webvtt_output_type {
