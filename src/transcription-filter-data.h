@@ -18,6 +18,8 @@
 #include <condition_variable>
 #include <functional>
 #include <string>
+#include <deque>
+#include <vector>
 
 #include "translation/translation.h"
 #include "translation/translation-includes.h"
@@ -214,9 +216,43 @@ struct transcription_filter_data {
 	TokenBufferThread translation_monitor;
 	TokenBufferThread cloud_translation_monitor;
 	int buffered_output_num_lines = 2;
-	int buffered_output_num_chars = 30;
+	int buffered_output_num_chars = 35;
 	TokenBufferSegmentation buffered_output_output_type =
-		TokenBufferSegmentation::SEGMENTATION_TOKEN;
+		TokenBufferSegmentation::SEGMENTATION_WORD;
+
+	// BOSSCAT Layer 2 — caption engine config
+	int caption_decay_seconds = 3;
+	std::string caption_label_text;
+	bool caption_label_enabled = false;
+
+	// BOSSCAT Layer 5 — sentence-buffered file output + SRT-per-recording
+	bool save_txt = false;        // independently toggle .txt output
+	std::string txt_file_path;    // path for .txt output
+	std::string srt_file_path;    // path for standalone .srt output
+	bool auto_srt_with_recording = false;
+	std::string auto_srt_file_path;   // active auto-SRT path (temp during recording)
+	uint64_t recording_start_ts = 0;  // ms, set on recording start for zeroed SRT timecodes
+	size_t auto_srt_sentence_number = 1;
+	std::string sentence_context_buffer; // pending text waiting for sentence boundary
+	int file_context_words = 50;
+
+	// BOSSCAT Layer 4 — remote whisper.cpp server
+	bool use_remote_whisper = false;
+	std::string whisper_server_host = "127.0.0.1";
+	int whisper_server_port = 8080;
+
+	// BOSSCAT Layer 3 — multi-source audio mix
+	// Ring buffer for one extra source (one per source in mix_extra_sources).
+	struct ExtraSourceAudio {
+		obs_source_t *source = nullptr;
+		std::mutex buf_mutex;
+		// Per-channel sample ring-buffers (float, native OBS sample rate).
+		std::deque<float> ch[MAX_PREPROC_CHANNELS];
+		uint32_t sample_rate = 0;
+		size_t channels = 0;
+	};
+	std::vector<std::string> mix_extra_source_names;
+	std::vector<std::shared_ptr<ExtraSourceAudio>> mix_extra_sources;
 
 #ifdef ENABLE_WEBVTT
 	enum struct webvtt_output_type {

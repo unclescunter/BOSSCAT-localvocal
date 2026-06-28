@@ -30,15 +30,21 @@ MODULE_EXPORT const char *obs_module_description(void)
 extern struct obs_source_info transcription_filter_info;
 extern void load_packet_callback_functions();
 
+/* BOSSCAT Layer 6 — caption dock (defined in transcription-filter.cpp) */
+extern void bosscat_module_load(void);
+extern void bosscat_module_unload(void);
+
 bool obs_module_load(void)
 {
 	obs_register_source(&transcription_filter_info);
 	load_packet_callback_functions();
+	bosscat_module_load();
 	obs_log(LOG_INFO, "plugin loaded successfully (version %s)", PLUGIN_VERSION);
 	return true;
 }
 
 void obs_module_unload(void)
 {
+	bosscat_module_unload();
 	obs_log(LOG_INFO, "plugin unloaded");
 }

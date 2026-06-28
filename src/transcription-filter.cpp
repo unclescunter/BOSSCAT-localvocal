@@ -10,6 +10,7 @@
 #include <iomanip>
 #include <bitset>
 #include <regex>
+#include <vector>
 #ifdef _WIN32
 #define NOMINMAX
 #include <Windows.h>
@@ -35,6 +36,7 @@
 #include "translation/translation-includes.h"
 #include "ui/filter-replace-dialog.h"
 #include "ui/filter-replace-utils.h"
+#include "caption-dock.h"
 
 void set_source_signals(transcription_filter_data *gf, obs_source_t *parent_source)
 {
@@ -113,6 +115,62 @@ void enumerate_gpu_devices(transcription_filter_data *gf)
 	};
 }
 
+// BOSSCAT Layer 3 — audio capture callback for extra mixed sources.
+static void extra_source_audio_cb(void *param, obs_source_t * /*source*/,
+				  const struct audio_data *audio, bool muted)
+{
+	using ExtraSourceAudio = transcription_filter_data::ExtraSourceAudio;
+	auto *esa = static_cast<ExtraSourceAudio *>(param);
+	if (!audio || muted || esa->channels == 0)
+		return;
+
+	std::lock_guard<std::mutex> lock(esa->buf_mutex);
+	for (size_t c = 0; c < esa->channels && c < MAX_PREPROC_CHANNELS; c++) {
+		const float *src = reinterpret_cast<const float *>(audio->data[c]);
+		if (src) {
+			for (uint32_t f = 0; f < audio->frames; f++)
+				esa->ch[c].push_back(src[f]);
+		}
+	}
+}
+
+// Tear down extra-source mix capture callbacks.
+static void teardown_mix_sources(transcription_filter_data *gf)
+{
+	using ExtraSourceAudio = transcription_filter_data::ExtraSourceAudio;
+	for (auto &esa : gf->mix_extra_sources) {
+		if (esa && esa->source) {
+			obs_source_remove_audio_capture_callback(
+				esa->source, extra_source_audio_cb, esa.get());
+			obs_source_release(esa->source);
+			esa->source = nullptr;
+		}
+	}
+	gf->mix_extra_sources.clear();
+}
+
+// Set up capture callbacks for named extra sources.
+static void setup_mix_sources(transcription_filter_data *gf)
+{
+	using ExtraSourceAudio = transcription_filter_data::ExtraSourceAudio;
+	teardown_mix_sources(gf);
+	for (const auto &name : gf->mix_extra_source_names) {
+		if (name.empty())
+			continue;
+		obs_source_t *src = obs_get_source_by_name(name.c_str());
+		if (!src) {
+			obs_log(LOG_WARNING, "mix_extra_source '%s' not found", name.c_str());
+			continue;
+		}
+		auto esa = std::make_shared<ExtraSourceAudio>();
+		esa->source = src; // takes the reference returned by obs_get_source_by_name
+		esa->channels = gf->channels;
+		esa->sample_rate = gf->sample_rate;
+		obs_source_add_audio_capture_callback(src, extra_source_audio_cb, esa.get());
+		gf->mix_extra_sources.push_back(std::move(esa));
+	}
+}
+
 struct obs_audio_data *transcription_filter_filter_audio(void *data, struct obs_audio_data *audio)
 {
 	if (!audio) {
@@ -157,11 +215,38 @@ struct obs_audio_data *transcription_filter_filter_audio(void *data, struct obs_
 
 	{
 		std::lock_guard<std::mutex> lock(gf->whisper_buf_mutex); // scoped lock
-		// push back current audio data to input deque
+
+		// BOSSCAT Layer 3: sum extra-source audio into the input buffers.
+		// We mix into a temporary float array to keep the main deque_push_back simple.
+		std::vector<std::vector<float>> mixed(gf->channels,
+						      std::vector<float>(audio->frames, 0.0f));
+
+		// Copy main source into mix buffer.
 		for (size_t c = 0; c < gf->channels; c++) {
-			deque_push_back(&gf->input_buffers[c], audio->data[c],
+			const float *src = reinterpret_cast<const float *>(audio->data[c]);
+			for (uint32_t f = 0; f < audio->frames; f++)
+				mixed[c][f] = src ? src[f] : 0.0f;
+		}
+
+		// Add extra sources.
+		for (auto &esa : gf->mix_extra_sources) {
+			std::lock_guard<std::mutex> elock(esa->buf_mutex);
+			for (size_t c = 0; c < gf->channels && c < MAX_PREPROC_CHANNELS; c++) {
+				for (uint32_t f = 0; f < audio->frames; f++) {
+					if (!esa->ch[c].empty()) {
+						mixed[c][f] += esa->ch[c].front();
+						esa->ch[c].pop_front();
+					}
+				}
+			}
+		}
+
+		// Push mixed audio into input deques.
+		for (size_t c = 0; c < gf->channels; c++) {
+			deque_push_back(&gf->input_buffers[c], mixed[c].data(),
 					audio->frames * sizeof(float));
 		}
+
 		// push audio packet info (timestamp/frame count) to info deque
 		struct transcription_filter_audio_info info = {0};
 		info.frames = audio->frames; // number of frames in this packet
@@ -205,6 +290,8 @@ void transcription_filter_destroy(void *data)
 	signal_handler_disconnect(sh_filter, "enable", enable_callback, gf);
 
 	obs_log(gf->log_level, "filter destroy");
+	caption_registry_remove(gf); // BOSSCAT Layer 6
+	teardown_mix_sources(gf); // BOSSCAT Layer 3
 	shutdown_whisper_thread(gf);
 
 	if (gf->resampler_to_whisper) {
@@ -312,6 +399,17 @@ void transcription_filter_update(void *data, obs_data_t *s)
 	gf->truncate_output_file = obs_data_get_bool(s, "truncate_output_file");
 	gf->save_only_while_recording = obs_data_get_bool(s, "only_while_recording");
 	gf->rename_file_to_match_recording = obs_data_get_bool(s, "rename_file_to_match_recording");
+	// BOSSCAT Layer 5 — sentence-buffered file output
+	gf->save_txt = obs_data_get_bool(s, "save_txt");
+	{
+		const char *tp = obs_data_get_string(s, "txt_file_path");
+		gf->txt_file_path = (tp && *tp) ? tp : "";
+		const char *sp = obs_data_get_string(s, "srt_file_path");
+		gf->srt_file_path = (sp && *sp) ? sp : "";
+	}
+	gf->auto_srt_with_recording = obs_data_get_bool(s, "auto_srt_with_recording");
+	gf->file_context_words = (int)obs_data_get_int(s, "file_context_words");
+	if (gf->file_context_words <= 0) gf->file_context_words = 50;
 	// Get the current timestamp using the system clock
 	gf->start_timestamp_ms = now_ms();
 	gf->sentence_number = 1;
@@ -323,11 +421,59 @@ void transcription_filter_update(void *data, obs_data_t *s)
 	gf->segment_duration = (int)obs_data_get_int(s, "segment_duration");
 	gf->partial_transcription = obs_data_get_bool(s, "partial_group");
 	gf->partial_latency = (int)obs_data_get_int(s, "partial_latency");
+
+	// BOSSCAT Layer 4 — remote whisper server settings
+	gf->use_remote_whisper = obs_data_get_bool(s, "use_remote_whisper");
+	{
+		const char *h = obs_data_get_string(s, "whisper_remote_host");
+		gf->whisper_server_host = (h && *h) ? h : "127.0.0.1";
+	}
+	gf->whisper_server_port = (int)obs_data_get_int(s, "whisper_remote_port");
+	if (gf->whisper_server_port <= 0)
+		gf->whisper_server_port = 8080;
+
+	// BOSSCAT Layer 3 — parse comma-separated extra source names and set up capture.
+	{
+		const char *raw = obs_data_get_string(s, "mix_extra_sources");
+		std::vector<std::string> names;
+		if (raw && strlen(raw) > 0) {
+			std::string raw_str(raw);
+			std::istringstream iss(raw_str);
+			std::string tok;
+			while (std::getline(iss, tok, ',')) {
+				// trim whitespace
+				size_t p0 = tok.find_first_not_of(" \t");
+				size_t p1 = tok.find_last_not_of(" \t");
+				if (p0 != std::string::npos)
+					names.push_back(tok.substr(p0, p1 - p0 + 1));
+			}
+		}
+		if (names != gf->mix_extra_source_names) {
+			gf->mix_extra_source_names = names;
+			setup_mix_sources(gf);
+		}
+	}
+
 	bool new_buffered_output = obs_data_get_bool(s, "buffered_output");
-	int new_buffer_num_lines = (int)obs_data_get_int(s, "buffer_num_lines");
-	int new_buffer_num_chars_per_line = (int)obs_data_get_int(s, "buffer_num_chars_per_line");
-	TokenBufferSegmentation new_buffer_output_type =
-		(TokenBufferSegmentation)obs_data_get_int(s, "buffer_output_type");
+	int new_buffer_num_lines = (int)obs_data_get_int(s, "caption_max_lines");
+	int new_buffer_num_chars_per_line = (int)obs_data_get_int(s, "caption_soft_target");
+	// Keep legacy keys as fallback if new ones are zero (fresh install of old settings)
+	if (new_buffer_num_lines <= 0)
+		new_buffer_num_lines = (int)obs_data_get_int(s, "buffer_num_lines");
+	if (new_buffer_num_chars_per_line <= 0)
+		new_buffer_num_chars_per_line = (int)obs_data_get_int(s, "buffer_num_chars_per_line");
+	if (new_buffer_num_lines <= 0)
+		new_buffer_num_lines = 2;
+	if (new_buffer_num_chars_per_line <= 0)
+		new_buffer_num_chars_per_line = 35;
+	TokenBufferSegmentation new_buffer_output_type = SEGMENTATION_WORD;
+	int new_caption_decay = (int)obs_data_get_int(s, "caption_decay_seconds");
+	if (new_caption_decay <= 0)
+		new_caption_decay = 3;
+	gf->caption_decay_seconds = new_caption_decay;
+	gf->caption_label_enabled = obs_data_get_bool(s, "caption_label_enabled");
+	const char *lbl = obs_data_get_string(s, "caption_label_text");
+	gf->caption_label_text = (lbl != nullptr) ? lbl : "";
 	const char *filter_words_replace = obs_data_get_string(s, "filter_words_replace");
 	if (filter_words_replace != nullptr && strlen(filter_words_replace) > 0) {
 		obs_log(gf->log_level, "filter_words_replace: %s", filter_words_replace);
@@ -368,7 +514,9 @@ void transcription_filter_update(void *data, obs_data_t *s)
 					}
 				},
 				new_buffer_num_lines, new_buffer_num_chars_per_line,
-				std::chrono::seconds(3), new_buffer_output_type);
+				std::chrono::seconds(new_caption_decay), new_buffer_output_type);
+			gf->captions_monitor.setLabel(gf->caption_label_text,
+						      gf->caption_label_enabled);
 			gf->translation_monitor.initialize(
 				gf,
 				[gf](const std::string &translated_text) {
@@ -382,7 +530,7 @@ void transcription_filter_update(void *data, obs_data_t *s)
 					}
 				},
 				new_buffer_num_lines, new_buffer_num_chars_per_line,
-				std::chrono::seconds(3), new_buffer_output_type);
+				std::chrono::seconds(new_caption_decay), new_buffer_output_type);
 			gf->cloud_translation_monitor.initialize(
 				gf,
 				[gf](const std::string &translated_text) {
@@ -396,7 +544,7 @@ void transcription_filter_update(void *data, obs_data_t *s)
 					}
 				},
 				new_buffer_num_lines, new_buffer_num_chars_per_line,
-				std::chrono::seconds(3), new_buffer_output_type);
+				std::chrono::seconds(new_caption_decay), new_buffer_output_type);
 		} else {
 			if (new_buffer_num_lines != gf->buffered_output_num_lines ||
 			    new_buffer_num_chars_per_line != gf->buffered_output_num_chars ||
@@ -453,6 +601,11 @@ void transcription_filter_update(void *data, obs_data_t *s)
 					});
 			}
 		}
+		// Always update decay and label (they may change independently).
+		gf->captions_monitor.setMaxTime(std::chrono::seconds(new_caption_decay));
+		gf->captions_monitor.setLabel(gf->caption_label_text, gf->caption_label_enabled);
+		gf->translation_monitor.setMaxTime(std::chrono::seconds(new_caption_decay));
+		gf->cloud_translation_monitor.setMaxTime(std::chrono::seconds(new_caption_decay));
 		gf->buffered_output_num_lines = new_buffer_num_lines;
 		gf->buffered_output_num_chars = new_buffer_num_chars_per_line;
 		gf->buffered_output_output_type = new_buffer_output_type;
@@ -723,6 +876,14 @@ void *transcription_filter_create(obs_data_t *settings, obs_source_t *filter)
 	// to match the subtitles with the recording
 	obs_frontend_add_event_callback(recording_state_callback, gf);
 
+	// BOSSCAT Layer 6 — register with caption dock.
+	{
+		obs_source_t *parent = obs_filter_get_parent(gf->context);
+		std::string host_name =
+			parent ? std::string(obs_source_get_name(parent)) : "";
+		caption_registry_add(gf, host_name);
+	}
+
 	obs_log(gf->log_level, "filter created.");
 	return gf;
 }
@@ -777,4 +938,15 @@ void load_packet_callback_functions()
 		reinterpret_cast<obs_output_remove_packet_callback_t *>(remove_callback);
 
 	obs_log(LOG_INFO, "loaded callbacks");
+}
+
+// BOSSCAT Layer 6 — called from obs_module_load (via plugin-main.c extern).
+extern "C" void bosscat_module_load()
+{
+	caption_dock_init();
+}
+
+extern "C" void bosscat_module_unload()
+{
+	caption_dock_shutdown();
 }
