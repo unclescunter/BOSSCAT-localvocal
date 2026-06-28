@@ -225,6 +225,11 @@ struct transcription_filter_data {
 	std::string caption_label_text;
 	bool caption_label_enabled = false;
 
+	// BOSSCAT Layer 4 — remote whisper.cpp server
+	bool use_remote_whisper = false;
+	std::string whisper_server_host = "127.0.0.1";
+	int whisper_server_port = 8080;
+
 	// BOSSCAT Layer 3 — multi-source audio mix
 	// Ring buffer for one extra source (one per source in mix_extra_sources).
 	struct ExtraSourceAudio {

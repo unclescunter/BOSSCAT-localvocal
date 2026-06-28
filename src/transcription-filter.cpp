@@ -409,6 +409,16 @@ void transcription_filter_update(void *data, obs_data_t *s)
 	gf->partial_transcription = obs_data_get_bool(s, "partial_group");
 	gf->partial_latency = (int)obs_data_get_int(s, "partial_latency");
 
+	// BOSSCAT Layer 4 — remote whisper server settings
+	gf->use_remote_whisper = obs_data_get_bool(s, "use_remote_whisper");
+	{
+		const char *h = obs_data_get_string(s, "whisper_remote_host");
+		gf->whisper_server_host = (h && *h) ? h : "127.0.0.1";
+	}
+	gf->whisper_server_port = (int)obs_data_get_int(s, "whisper_remote_port");
+	if (gf->whisper_server_port <= 0)
+		gf->whisper_server_port = 8080;
+
 	// BOSSCAT Layer 3 — parse comma-separated extra source names and set up capture.
 	{
 		const char *raw = obs_data_get_string(s, "mix_extra_sources");

@@ -1,3 +1,6 @@
+// This file is part of BOSSCAT-localvocal, a GPL-2.0 fork of obs-localvocal
+// by Roy Shilkrot (https://github.com/locaal-ai/obs-localvocal).
+// Modifications (c) 2025 unclescunter, licensed GPL-2.0. See CHANGES.md.
 #include <whisper.h>
 
 #include <obs-module.h>
@@ -8,6 +11,7 @@
 #include "transcription-filter-data.h"
 #include "whisper-processing.h"
 #include "whisper-utils.h"
+#include "remote-whisper.h"
 #include "transcription-utils.h"
 
 #ifdef _WIN32
@@ -356,9 +360,17 @@ void run_inference_and_callbacks(transcription_filter_data *gf, uint64_t start_o
 
 	auto inference_start_ts = now_ms();
 
-	struct DetectionResultWithText inference_result =
-		run_whisper_inference(gf, pcm32f_data, pcm32f_size_with_silence, start_offset_ms,
-				      end_offset_ms, vad_state);
+	// BOSSCAT Layer 4 — branch to remote server if enabled.
+	struct DetectionResultWithText inference_result;
+	if (gf->use_remote_whisper) {
+		inference_result = run_remote_whisper_inference(
+			gf, pcm32f_data, pcm32f_size_with_silence, start_offset_ms,
+			end_offset_ms);
+	} else {
+		inference_result =
+			run_whisper_inference(gf, pcm32f_data, pcm32f_size_with_silence,
+					      start_offset_ms, end_offset_ms, vad_state);
+	}
 	// output inference result to a text source
 	set_text_callback(inference_start_ts, gf, inference_result);
 

@@ -1,6 +1,8 @@
 #ifndef WHISPER_PROCESSING_H
 #define WHISPER_PROCESSING_H
 
+#include <string>
+#include <vector>
 #include <whisper.h>
 
 // buffer size in msec

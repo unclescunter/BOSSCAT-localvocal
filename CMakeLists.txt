@@ -173,6 +173,7 @@ target_sources(
           src/whisper-utils/whisper-params.cpp
           src/whisper-utils/silero-vad-onnx.cpp
           src/whisper-utils/token-buffer-thread.cpp
+          src/whisper-utils/remote-whisper.cpp
           src/whisper-utils/vad-processing.cpp
           src/translation/language_codes.cpp
           src/translation/translation.cpp

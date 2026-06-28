@@ -671,6 +671,16 @@ obs_properties_t *transcription_filter_properties(void *data)
 	obs_properties_add_text(mix_group, "mix_extra_sources", MT_("mix_extra_sources"),
 				OBS_TEXT_DEFAULT);
 
+	// BOSSCAT Layer 4 — remote whisper.cpp server backend
+	obs_properties_t *remote_group = obs_properties_create();
+	obs_properties_add_group(ppts, "remote_whisper_group", MT_("whisper_backend"),
+				 OBS_GROUP_CHECKABLE, remote_group);
+	obs_properties_add_bool(remote_group, "use_remote_whisper", MT_("whisper_backend"));
+	obs_properties_add_text(remote_group, "whisper_remote_host", MT_("whisper_remote_host"),
+				OBS_TEXT_DEFAULT);
+	obs_properties_add_int(remote_group, "whisper_remote_port", MT_("whisper_remote_port"),
+			       1, 65535, 1);
+
 	add_advanced_group_properties(ppts, gf);
 	add_logging_group_properties(ppts);
 	add_partial_group_properties(ppts);
@@ -697,6 +707,9 @@ void transcription_filter_defaults(obs_data_t *s)
 				 (int)TokenBufferSegmentation::SEGMENTATION_WORD);
 	// BOSSCAT Layer 2 defaults
 	obs_data_set_default_string(s, "mix_extra_sources", ""); // Layer 3
+	obs_data_set_default_bool(s, "use_remote_whisper", false); // Layer 4
+	obs_data_set_default_string(s, "whisper_remote_host", "127.0.0.1");
+	obs_data_set_default_int(s, "whisper_remote_port", 8080);
 	obs_data_set_default_int(s, "caption_soft_target", 35);
 	obs_data_set_default_int(s, "caption_max_lines", 2);
 	obs_data_set_default_int(s, "caption_decay_seconds", 3);
