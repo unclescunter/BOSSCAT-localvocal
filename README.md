@@ -56,25 +56,26 @@ Current Features:
 - 100s of fine-tuned Whisper models for dozens of languages from HuggingFace
 
 ## Features I talked claude into adding
+- Auto generate an .srt file whenever you press record or stream.
 - A live view dock that prints all text in a scene into obs for the creator
-- A "mute subtitles" button on that dock tht hides all subtitles. -> I'm looking at making this link to the source's visibility.
+- A "mute subtitles" button on the dock that hides all subtitles.
 - Subtitle decay in seconds, line length and line limit all work on linux now, freetype2 just isn't capable of textwrapping itself
 - The ability to label separate inputs so avoid confusion if titles are the same colour
 - ***untested*** the ability to use a separate whisper server on a self defined networked device
 - actually builds for fedora now, shopuld build for others. there were a couple of quirks like having to ```export CFLAGS="-fPIC"
 export CXXFLAGS="-fPIC"``` or add ```-DCMAKE_POSITION_INDEPENDENT_CODE=ON``` 
 This should Todd Howard now just follow the build instructions.
+- The buffer would fill up and slow down. I haven't actually fixed that I've just added a slider to restart the service silently when the audio feed goes silent for x seconds, cheap workaround but it works great while I troubleshoot what's wrong.
 
 ## Features that have changed
-- Muting audio sources no longer turns subtitles off, for that use audio source visibility. That should turn it off cleanly
+
+- Each source can generate it's own .srt with the label appended, following normal obs naming structure YYYY-MM-DD\ HH-MM-SS so you can pair recordings with the srt. (sometimes timestamps are a little funny, we'll work it out.) The source does append it's label if it has chosen to record a separate .srt
 
 ## Features I think I broke/will fix
-- Local translation with whisper, other models work maybe this is just how I'm setting it up. I think whisper specifically needs to write to a different file then translate it after or I just don't have the language model I'm trying to train in etc this needs diagnosing.
-- Generated .srt files are absolute doggy doo and idk how I broke it but ideally I would like the option to create a "combined" .srt that has all sources labelled clearly for who is speaking and their sentences correctly concatenated so that it can be added to video later. The dock actually outputs almost the EXACT output that I want I just need to find a way to write that to an .srt file.
-- Each source should be able to generate it's own .srt with the label appended, normal obs naming structure is YYYY-MM-DD\ HH-MM-SS. The source should append it's label if it has chosen to record a separate .srt
-- The .srt files should auto generate with the naming prefix so that when you press record or stream, the plugin generates a new .srt
-- The dock "BOSSCAT Captions" spawns perfectly, works perfectly, does exactly what I want it to but, if you close it, you can't get it back because it isn't in the docks dropdown menu.
-- Sort the gui menu elements out properly into "simple" and "advanced" and rearrange the menu to reflect the real categories everything should be in.
+- Local translation with whisper, other translation models work maybe this is just how I'm setting it up. I think whisper specifically needs to write to a different file then translate it after or I just don't have the language model I'm trying to train in etc this needs diagnosing.
+- Generated .srt files are "better". Still a wip. I think there's something being overloaded somewhere when I use too many speakers & translations.
+- The dock requires a bounding box and to dynamically divide the Y space between all shown filters.
+- GUI almsot fixed.
 
 ### Available Versions
 
