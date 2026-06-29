@@ -228,9 +228,11 @@ struct transcription_filter_data {
 	bool caption_label_enabled = false;
 
 	// BOSSCAT Layer 5 — sentence-buffered file output + SRT-per-recording
-	bool save_txt = false;        // independently toggle .txt output
-	std::string txt_file_path;    // path for .txt output
-	std::string srt_file_path;    // path for standalone .srt output
+	bool save_txt = false;
+	std::string txt_file_path;
+	std::string srt_file_path;
+	std::string output_directory;          // directory mode: folder for generated files
+	bool specify_output_filename = false;  // when true, use explicit output_file_path instead
 	bool auto_srt_with_recording = false;
 	std::string auto_srt_file_path;   // active auto-SRT path (temp during recording)
 	uint64_t recording_start_ts = 0;  // ms, set on recording start for zeroed SRT timecodes

@@ -488,14 +488,23 @@ void transcription_filter_update(void *data, obs_data_t *s)
 		gf->filter_words_replace.clear();
 	}
 
+	{
+		const char *dir = obs_data_get_string(s, "subtitle_output_directory");
+		gf->output_directory = (dir && *dir) ? dir : "";
+	}
+	gf->specify_output_filename = obs_data_get_bool(s, "specify_output_filename");
+
 	if (gf->save_to_file) {
 		gf->output_file_path = "";
-		const char *output_file_path = obs_data_get_string(s, "subtitle_output_filename");
-		if (output_file_path != nullptr && strlen(output_file_path) > 0) {
-			gf->output_file_path = output_file_path;
-		} else {
-			obs_log(gf->log_level, "output file path is empty, but selected to save");
+		if (gf->specify_output_filename) {
+			const char *path = obs_data_get_string(s, "subtitle_output_filename");
+			if (path && *path)
+				gf->output_file_path = path;
+		} else if (!gf->output_directory.empty()) {
+			gf->output_file_path = gf->output_directory + "/subtitles";
 		}
+		if (gf->output_file_path.empty())
+			obs_log(gf->log_level, "output file path is empty, but selected to save");
 	}
 
 	if (new_buffered_output) {

@@ -110,17 +110,30 @@ bool advanced_settings_callback(obs_properties_t *props, obs_property_t *propert
 	return true;
 }
 
+bool specify_filename_changed(obs_properties_t *props, obs_property_t *property,
+			      obs_data_t *settings)
+{
+	UNUSED_PARAMETER(property);
+	const bool specify = obs_data_get_bool(settings, "specify_output_filename");
+	obs_property_set_visible(obs_properties_get(props, "subtitle_output_filename"), specify);
+	return true;
+}
+
 bool file_output_select_changed(obs_properties_t *props, obs_property_t *property,
 				obs_data_t *settings)
 {
 	UNUSED_PARAMETER(property);
 	const bool show_hide = obs_data_get_bool(settings, "file_output_enable");
 	for (const std::string &prop_name :
-	     {"subtitle_output_filename", "auto_srt_with_recording",
-	      "rename_file_to_match_recording", "output_format",
-	      "truncate_output_file", "only_while_recording", "file_context_words"}) {
+	     {"subtitle_output_directory", "auto_srt_with_recording",
+	      "rename_file_to_match_recording", "specify_output_filename",
+	      "output_format", "truncate_output_file", "only_while_recording", "file_context_words"}) {
 		obs_property_set_visible(obs_properties_get(props, prop_name.c_str()), show_hide);
 	}
+	// subtitle_output_filename only visible when enabled AND specify is checked
+	const bool specify = obs_data_get_bool(settings, "specify_output_filename");
+	obs_property_set_visible(obs_properties_get(props, "subtitle_output_filename"),
+				 show_hide && specify);
 	return true;
 }
 
@@ -457,13 +470,21 @@ void add_file_output_group_properties(obs_properties_t *ppts)
 		obs_properties_add_group(ppts, "file_output_enable", MT_("file_output_group"),
 					 OBS_GROUP_CHECKABLE, file_output_group);
 
-	obs_properties_add_path(file_output_group, "subtitle_output_filename",
-				MT_("output_filename"), OBS_PATH_FILE_SAVE, "Captions (*.srt *.txt)",
-				NULL);
+	obs_properties_add_path(file_output_group, "subtitle_output_directory",
+				MT_("output_directory"), OBS_PATH_DIRECTORY, NULL, NULL);
 	obs_properties_add_bool(file_output_group, "auto_srt_with_recording",
 				MT_("auto_srt_with_recording"));
 	obs_properties_add_bool(file_output_group, "rename_file_to_match_recording",
 				MT_("rename_file_to_match_recording"));
+	obs_property_t *specify_prop =
+		obs_properties_add_bool(file_output_group, "specify_output_filename",
+					MT_("specify_output_filename"));
+	obs_property_set_modified_callback(specify_prop, specify_filename_changed);
+	obs_property_t *filename_prop =
+		obs_properties_add_path(file_output_group, "subtitle_output_filename",
+					MT_("output_filename"), OBS_PATH_FILE_SAVE,
+					"Captions (*.srt *.txt)", NULL);
+	obs_property_set_visible(filename_prop, false);
 	obs_property_t *fmt_prop =
 		obs_properties_add_list(file_output_group, "output_format", MT_("output_format"),
 					OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
@@ -719,6 +740,8 @@ void transcription_filter_defaults(obs_data_t *s)
 	obs_data_set_default_string(s, "output_format", "srt");
 	obs_data_set_default_bool(s, "auto_srt_with_recording", false);
 	obs_data_set_default_int(s, "file_context_words", 50);
+	obs_data_set_default_string(s, "subtitle_output_directory", "");
+	obs_data_set_default_bool(s, "specify_output_filename", false);
 	// BOSSCAT Layer 2 defaults
 	obs_data_set_default_string(s, "mix_extra_sources", ""); // Layer 3
 	obs_data_set_default_bool(s, "use_remote_whisper", false); // Layer 4

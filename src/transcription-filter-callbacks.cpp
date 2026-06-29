@@ -802,8 +802,13 @@ void recording_state_callback(enum obs_frontend_event event, void *data)
 			char *recFile = obs_frontend_get_last_recording();
 			if (recFile && strlen(recFile) > 0) {
 				fs::path recPath(recFile);
-				fs::path srtDest = recPath.parent_path() /
-						   (recPath.stem().string() + ".srt");
+				// Directory mode: keep in output folder; else place next to recording.
+				fs::path srtDest =
+					!gf_->output_directory.empty()
+						? fs::path(gf_->output_directory) /
+							  (recPath.stem().string() + ".srt")
+						: recPath.parent_path() /
+							  (recPath.stem().string() + ".srt");
 				try {
 					if (fs::exists(gf_->auto_srt_file_path)) {
 						fs::rename(gf_->auto_srt_file_path, srtDest);
@@ -823,44 +828,45 @@ void recording_state_callback(enum obs_frontend_event event, void *data)
 			return;
 		}
 
-		namespace fs = std::filesystem;
-
-		fs::path outputPath(gf_->output_file_path);
-
-		try {
-			if (!std::filesystem::exists(outputPath)) {
-				obs_log(gf_->log_level, "Output file is empty");
-				return;
-			}
+		{
+			namespace fs = std::filesystem;
 
 			char *recordingFileName = obs_frontend_get_last_recording();
-			std::string recordingFileNameStr(recordingFileName);
+			if (!recordingFileName || strlen(recordingFileName) == 0) {
+				if (recordingFileName)
+					bfree(recordingFileName);
+				return;
+			}
+			fs::path recPath(recordingFileName);
 			bfree(recordingFileName);
 
-			fs::path recordingPath(recordingFileNameStr);
-			fs::path newPath = recordingPath.stem();
+			// Derive stem (strip extension if present) from configured output path.
+			auto dot = gf_->output_file_path.rfind('.');
+			std::string stem = (dot != std::string::npos)
+						    ? gf_->output_file_path.substr(0, dot)
+						    : gf_->output_file_path;
 
-			if (gf_->save_srt) {
-				obs_log(gf_->log_level, "Recording stopped. Rename srt file.");
-				newPath.replace_extension(".srt");
-			} else {
-				obs_log(gf_->log_level,
-					"Recording stopped. Rename transcript file.");
-				std::string newExtension = outputPath.extension().string();
+			// Directory mode: keep in folder; else next to recording.
+			fs::path destDir = !gf_->output_directory.empty()
+						   ? fs::path(gf_->output_directory)
+						   : recPath.parent_path();
 
-				if (newExtension == recordingPath.extension().string()) {
-					newExtension += ".txt";
+			try {
+				if (gf_->save_srt) {
+					fs::path src(stem + ".srt");
+					if (fs::exists(src))
+						fs::rename(src,
+							   destDir / (recPath.stem().string() + ".srt"));
 				}
-
-				newPath.replace_extension(newExtension);
+				if (gf_->save_txt) {
+					fs::path src(stem + ".txt");
+					if (fs::exists(src))
+						fs::rename(src,
+							   destDir / (recPath.stem().string() + ".txt"));
+				}
+			} catch (const fs::filesystem_error &e) {
+				obs_log(LOG_ERROR, "Error renaming output file - %s", e.what());
 			}
-
-			// make sure newPath is next to the recording file
-			newPath = recordingPath.parent_path() / newPath.filename();
-
-			fs::rename(outputPath, newPath);
-		} catch (const std::filesystem::filesystem_error &e) {
-			obs_log(LOG_ERROR, "Error renaming output file - %s", e.what());
 		}
 	} else if (event == OBS_FRONTEND_EVENT_STREAMING_STARTING) {
 #ifdef ENABLE_WEBVTT
