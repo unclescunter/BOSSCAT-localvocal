@@ -243,6 +243,13 @@ struct transcription_filter_data {
 	std::string sentence_context_buffer; // pending text waiting for sentence boundary
 	int file_context_words = 50;
 
+	// BOSSCAT — silence-triggered whisper context refresh (dirty cache-clear workaround).
+	// After this many seconds of continuous silence, the whisper context is freed and
+	// reloaded in-place to clear accumulated KV-cache state that causes slowdowns.
+	// 0 = disabled.
+	int whisper_silence_restart_secs = 0;
+	uint64_t last_whisper_restart_time = 0;
+
 	// BOSSCAT Layer 4 — remote whisper.cpp server
 	bool use_remote_whisper = false;
 	std::string whisper_server_host = "127.0.0.1";

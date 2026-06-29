@@ -407,6 +407,8 @@ void transcription_filter_update(void *data, obs_data_t *s)
 	gf->last_sub_render_time = now_ms();
 	gf->duration_filter_threshold = (float)obs_data_get_double(s, "duration_filter_threshold");
 	gf->segment_duration = (int)obs_data_get_int(s, "segment_duration");
+	gf->whisper_silence_restart_secs =
+		(int)obs_data_get_int(s, "whisper_silence_restart_secs");
 	gf->partial_transcription = obs_data_get_bool(s, "partial_group");
 	gf->partial_latency = (int)obs_data_get_int(s, "partial_latency");
 

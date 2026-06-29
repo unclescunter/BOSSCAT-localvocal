@@ -414,8 +414,13 @@ void whisper_loop(void *data)
 		}
 
 		if (gf->clear_buffers) {
-			deque_pop_front(&gf->resampled_buffer, nullptr, 0);
-			deque_pop_front(&gf->whisper_buffer, nullptr, 0);
+			// Drain entire buffer contents (nullptr dst = discard).
+			if (gf->resampled_buffer.size)
+				deque_pop_front(&gf->resampled_buffer, nullptr,
+						gf->resampled_buffer.size);
+			if (gf->whisper_buffer.size)
+				deque_pop_front(&gf->whisper_buffer, nullptr,
+						gf->whisper_buffer.size);
 			current_vad_state = {false, now_ms(), 0, 0};
 			gf->clear_buffers = false;
 		}
@@ -437,6 +442,41 @@ void whisper_loop(void *data)
 					"Clearing current subtitle. now: %lu ms, last: %lu ms", now,
 					gf->last_sub_render_time);
 				clear_current_caption(gf);
+			}
+		}
+
+		// BOSSCAT — silence-triggered in-place whisper context refresh.
+		// Frees and reloads the whisper context after sustained silence to clear
+		// accumulated KV-cache state that causes subtitle latency to grow over time.
+		if (gf->whisper_silence_restart_secs > 0 &&
+		    !gf->whisper_model_file_currently_loaded.empty()) {
+			const uint64_t now = now_ms();
+			const uint64_t silence_ms = now - gf->last_sub_render_time;
+			const uint64_t since_restart = now - gf->last_whisper_restart_time;
+			const uint64_t threshold_ms =
+				(uint64_t)gf->whisper_silence_restart_secs * 1000;
+			if (silence_ms >= threshold_ms && since_restart >= threshold_ms) {
+				obs_log(LOG_INFO,
+					"Whisper context refresh after %llu ms silence (threshold %llu ms)",
+					silence_ms, threshold_ms);
+				// Clear stale audio buffers accumulated during silence.
+				gf->clear_buffers = true;
+				// Reinit the context in-place while holding the mutex.
+				// Other code that locks whisper_ctx_mutex will simply wait.
+				{
+					std::lock_guard<std::mutex> lock(gf->whisper_ctx_mutex);
+					whisper_free(gf->whisper_context);
+					gf->whisper_context = nullptr;
+					gf->whisper_context = init_whisper_context(
+						gf->whisper_model_file_currently_loaded, gf);
+				}
+				gf->last_whisper_restart_time = now_ms();
+				if (gf->whisper_context == nullptr) {
+					obs_log(LOG_ERROR,
+						"Whisper context refresh failed — thread exiting");
+					break;
+				}
+				obs_log(LOG_INFO, "Whisper context refreshed OK");
 			}
 		}
 

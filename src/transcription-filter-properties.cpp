@@ -528,6 +528,10 @@ void add_advanced_group_properties(obs_properties_t *ppts, struct transcription_
 	obs_properties_add_int_slider(advanced_config_group, "segment_duration",
 				      MT_("segment_duration"), 3000, 15000, 100);
 
+	// BOSSCAT — silence-triggered whisper restart interval (0 = disabled)
+	obs_properties_add_int_slider(advanced_config_group, "whisper_silence_restart_secs",
+				      MT_("whisper_silence_restart_secs"), 0, 300, 5);
+
 	// add button to open filter and replace UI dialog
 	obs_properties_add_button2(
 		advanced_config_group, "open_filter_ui", MT_("open_filter_ui"),
@@ -733,6 +737,7 @@ void transcription_filter_defaults(obs_data_t *s)
 	obs_data_set_default_double(s, "vad_threshold", 0.65);
 	obs_data_set_default_double(s, "duration_filter_threshold", 2.25);
 	obs_data_set_default_int(s, "segment_duration", 7000);
+	obs_data_set_default_int(s, "whisper_silence_restart_secs", 0);
 	obs_data_set_default_int(s, "log_level", LOG_DEBUG);
 	obs_data_set_default_bool(s, "log_words", false);
 	obs_data_set_default_bool(s, "caption_to_stream", false);
