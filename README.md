@@ -320,24 +320,29 @@ Adjust the version numbers to match what you actually have in `/usr/lib64/`.
 
 You missed one of the required flags. Wipe the build dir and start step 4 again with all three flags set.
 
-**AMD GPU not detected / ROCm inference not working (RX 6700 XT and similar)**
+**AMD GPU not used for inference (RX 6700 XT and similar RDNA2 cards)**
 
-Some AMD GPUs (e.g. RX 6700 XT / RDNA2) are not officially listed in ROCm's support matrix but work fine with a GFX version override. Set this environment variable **before launching OBS**:
+Some AMD GPUs are not in ROCm's official support matrix but work correctly with a GFX version override. Without it, the ROCm/HIP runtime will not recognise the GPU and whisper.cpp will silently fall back to CPU for all inference.
 
-```sh
-export HSA_OVERRIDE_GFX_VERSION=10.3.0
-QT_QPA_PLATFORM=xcb obs
-```
-
-To make it permanent, add the export to your shell profile (`~/.bashrc`, `~/.zshrc`, etc.) or create a small launcher script:
+This variable must be present in the environment **whenever any ROCm ML workload runs** — including the whisper.cpp inference inside the plugin. The simplest way to guarantee this is to set it system-wide:
 
 ```sh
-#!/usr/bin/env bash
-export HSA_OVERRIDE_GFX_VERSION=10.3.0
-exec obs "$@"
+# Add to /etc/environment (applies to all users and all processes at login)
+echo "HSA_OVERRIDE_GFX_VERSION=10.3.0" | sudo tee -a /etc/environment
 ```
 
-Without this, ROCm will not recognise the GPU and inference will silently fall back to CPU.
+Or per-user in your shell profile (`~/.bashrc`, `~/.zshrc`, `~/.profile`):
+
+```sh
+echo 'export HSA_OVERRIDE_GFX_VERSION=10.3.0' >> ~/.bashrc
+source ~/.bashrc
+```
+
+Log out and back in after editing `/etc/environment` for it to take effect system-wide. You can verify ROCm sees your GPU with:
+
+```sh
+HSA_OVERRIDE_GFX_VERSION=10.3.0 rocminfo | grep "Name:"
+```
 
 ---
 
