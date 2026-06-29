@@ -395,17 +395,6 @@ void transcription_filter_update(void *data, obs_data_t *s)
 	}
 #endif
 	gf->save_to_file = obs_data_get_bool(s, "file_output_enable");
-	{
-		const char *fmt = obs_data_get_string(s, "output_format");
-		const std::string fmtStr = (fmt && *fmt) ? fmt : "srt";
-		gf->save_srt = (fmtStr != "txt");
-		gf->save_txt = (fmtStr != "srt");
-	}
-	gf->truncate_output_file = obs_data_get_bool(s, "truncate_output_file");
-	gf->save_only_while_recording = obs_data_get_bool(s, "only_while_recording");
-	gf->rename_file_to_match_recording =
-		obs_data_get_bool(s, "rename_file_to_match_recording");
-	gf->auto_srt_with_recording = obs_data_get_bool(s, "auto_srt_with_recording");
 	gf->file_context_words = (int)obs_data_get_int(s, "file_context_words");
 	if (gf->file_context_words <= 0)
 		gf->file_context_words = 50;
@@ -492,23 +481,12 @@ void transcription_filter_update(void *data, obs_data_t *s)
 		const char *dir = obs_data_get_string(s, "subtitle_output_directory");
 		gf->output_directory = (dir && *dir) ? dir : "";
 	}
-	gf->specify_output_filename = obs_data_get_bool(s, "specify_output_filename");
-
-	if (gf->save_to_file) {
-		gf->output_file_path = "";
-		if (gf->specify_output_filename) {
-			const char *path = obs_data_get_string(s, "subtitle_output_filename");
-			if (path && *path)
-				gf->output_file_path = path;
-		} else if (!gf->output_directory.empty()) {
-			// Directory mode: no continuous file. All writing happens via the
-			// recording hooks (RECORDING_STARTED creates a temp SRT, STOPPED
-			// renames it to RecordingTitle[_Label].srt in the output folder).
-			gf->auto_srt_with_recording = true;
-		} else {
-			obs_log(gf->log_level, "output file path is empty, but selected to save");
-		}
-	}
+	// BOSSCAT — SRT session model: no continuous file. Files are generated per
+	// recording/stream by the global session (combined + per-source).
+	gf->srt_combined = obs_data_get_bool(s, "srt_combined");
+	gf->srt_per_source = obs_data_get_bool(s, "srt_per_source");
+	gf->srt_translated = obs_data_get_bool(s, "srt_translated");
+	gf->output_file_path = "";
 
 	if (new_buffered_output) {
 		obs_log(gf->log_level, "buffered_output enable");
@@ -821,16 +799,9 @@ void *transcription_filter_create(obs_data_t *settings, obs_source_t *filter)
 	gf->max_sub_duration = (int)obs_data_get_int(settings, "max_sub_duration");
 	gf->last_sub_render_time = now_ms();
 	gf->log_level = (int)obs_data_get_int(settings, "log_level");
-	{
-		const char *fmt = obs_data_get_string(settings, "output_format");
-		const std::string fmtStr = (fmt && *fmt) ? fmt : "srt";
-		gf->save_srt = (fmtStr != "txt");
-		gf->save_txt = (fmtStr != "srt");
-	}
-	gf->truncate_output_file = obs_data_get_bool(settings, "truncate_output_file");
-	gf->save_only_while_recording = obs_data_get_bool(settings, "only_while_recording");
-	gf->rename_file_to_match_recording =
-		obs_data_get_bool(settings, "rename_file_to_match_recording");
+	gf->srt_combined = obs_data_get_bool(settings, "srt_combined");
+	gf->srt_per_source = obs_data_get_bool(settings, "srt_per_source");
+	gf->srt_translated = obs_data_get_bool(settings, "srt_translated");
 	gf->process_while_muted = obs_data_get_bool(settings, "process_while_muted");
 	gf->buffered_output = obs_data_get_bool(settings, "buffered_output");
 	gf->initial_creation = true;

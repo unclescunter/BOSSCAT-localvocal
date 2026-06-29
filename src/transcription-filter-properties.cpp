@@ -44,6 +44,10 @@ bool translation_options_callback(obs_properties_t *props, obs_property_t *prope
 		(strcmp(obs_data_get_string(settings, "translate_model"), "!!!external!!!") == 0);
 	obs_property_set_visible(obs_properties_get(props, "translation_model_path_external"),
 				 is_external && translate_enabled);
+	// Keep the translated-SRT checkbox in sync with translation being enabled.
+	obs_property_set_visible(obs_properties_get(props, "srt_translated"),
+				 translate_enabled &&
+					 obs_data_get_bool(settings, "file_output_enable"));
 	return true;
 }
 
@@ -110,30 +114,20 @@ bool advanced_settings_callback(obs_properties_t *props, obs_property_t *propert
 	return true;
 }
 
-bool specify_filename_changed(obs_properties_t *props, obs_property_t *property,
-			      obs_data_t *settings)
-{
-	UNUSED_PARAMETER(property);
-	const bool specify = obs_data_get_bool(settings, "specify_output_filename");
-	obs_property_set_visible(obs_properties_get(props, "subtitle_output_filename"), specify);
-	return true;
-}
-
 bool file_output_select_changed(obs_properties_t *props, obs_property_t *property,
 				obs_data_t *settings)
 {
 	UNUSED_PARAMETER(property);
 	const bool show_hide = obs_data_get_bool(settings, "file_output_enable");
 	for (const std::string &prop_name :
-	     {"subtitle_output_directory", "auto_srt_with_recording",
-	      "rename_file_to_match_recording", "specify_output_filename",
-	      "output_format", "truncate_output_file", "only_while_recording", "file_context_words"}) {
+	     {"subtitle_output_directory", "srt_combined", "srt_per_source",
+	      "file_context_words"}) {
 		obs_property_set_visible(obs_properties_get(props, prop_name.c_str()), show_hide);
 	}
-	// subtitle_output_filename only visible when enabled AND specify is checked
-	const bool specify = obs_data_get_bool(settings, "specify_output_filename");
-	obs_property_set_visible(obs_properties_get(props, "subtitle_output_filename"),
-				 show_hide && specify);
+	// Translated SRT only makes sense with local translation enabled.
+	const bool translate_enabled = obs_data_get_bool(settings, "translate");
+	obs_property_set_visible(obs_properties_get(props, "srt_translated"),
+				 show_hide && translate_enabled);
 	return true;
 }
 
@@ -472,29 +466,9 @@ void add_file_output_group_properties(obs_properties_t *ppts)
 
 	obs_properties_add_path(file_output_group, "subtitle_output_directory",
 				MT_("output_directory"), OBS_PATH_DIRECTORY, NULL, NULL);
-	obs_properties_add_bool(file_output_group, "auto_srt_with_recording",
-				MT_("auto_srt_with_recording"));
-	obs_properties_add_bool(file_output_group, "rename_file_to_match_recording",
-				MT_("rename_file_to_match_recording"));
-	obs_property_t *specify_prop =
-		obs_properties_add_bool(file_output_group, "specify_output_filename",
-					MT_("specify_output_filename"));
-	obs_property_set_modified_callback(specify_prop, specify_filename_changed);
-	obs_property_t *filename_prop =
-		obs_properties_add_path(file_output_group, "subtitle_output_filename",
-					MT_("output_filename"), OBS_PATH_FILE_SAVE,
-					"Captions (*.srt *.txt)", NULL);
-	obs_property_set_visible(filename_prop, false);
-	obs_property_t *fmt_prop =
-		obs_properties_add_list(file_output_group, "output_format", MT_("output_format"),
-					OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
-	obs_property_list_add_string(fmt_prop, MT_("output_format_srt"), "srt");
-	obs_property_list_add_string(fmt_prop, MT_("output_format_txt"), "txt");
-	obs_property_list_add_string(fmt_prop, MT_("output_format_both"), "both");
-	obs_properties_add_bool(file_output_group, "truncate_output_file",
-				MT_("truncate_output_file"));
-	obs_properties_add_bool(file_output_group, "only_while_recording",
-				MT_("only_while_recording"));
+	obs_properties_add_bool(file_output_group, "srt_combined", MT_("srt_combined"));
+	obs_properties_add_bool(file_output_group, "srt_per_source", MT_("srt_per_source"));
+	obs_properties_add_bool(file_output_group, "srt_translated", MT_("srt_translated"));
 	obs_properties_add_int_slider(file_output_group, "file_context_words",
 				      MT_("file_context_words"), 5, 200, 5);
 	obs_property_set_modified_callback(file_output_group_prop, file_output_select_changed);
@@ -738,12 +712,12 @@ void transcription_filter_defaults(obs_data_t *s)
 	obs_data_set_default_int(s, "buffer_num_chars_per_line", 35);
 	obs_data_set_default_int(s, "buffer_output_type",
 				 (int)TokenBufferSegmentation::SEGMENTATION_WORD);
-	// BOSSCAT Layer 5 defaults
-	obs_data_set_default_string(s, "output_format", "srt");
-	obs_data_set_default_bool(s, "auto_srt_with_recording", false);
+	// BOSSCAT Layer 5 defaults — SRT session model
 	obs_data_set_default_int(s, "file_context_words", 50);
 	obs_data_set_default_string(s, "subtitle_output_directory", "");
-	obs_data_set_default_bool(s, "specify_output_filename", false);
+	obs_data_set_default_bool(s, "srt_combined", true);
+	obs_data_set_default_bool(s, "srt_per_source", false);
+	obs_data_set_default_bool(s, "srt_translated", false);
 	// BOSSCAT Layer 2 defaults
 	obs_data_set_default_string(s, "mix_extra_sources", ""); // Layer 3
 	obs_data_set_default_bool(s, "use_remote_whisper", false); // Layer 4

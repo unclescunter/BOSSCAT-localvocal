@@ -227,6 +227,10 @@ void send_translated_sentence_to_file(struct transcription_filter_data *gf,
 				      const std::string &target_lang)
 {
 	// if translation is enabled, save the translated sentence to another file
+	if (gf->output_file_path.empty()) {
+		// SRT-session model: no continuous output file path configured.
+		return;
+	}
 	if (translated_sentence.empty()) {
 		obs_log(gf->log_level, "Translation is empty, not saving to file");
 	} else {
@@ -386,47 +390,39 @@ void output_text(struct transcription_filter_data *gf, const DetectionResultWith
 				gf->sentence_context_buffer =
 					(remainder != std::string::npos) ? buf.substr(remainder) : "";
 
-				// Write to output file(s) derived from the configured path.
-				if (gf->save_to_file && !gf->output_file_path.empty()) {
-					auto dot = gf->output_file_path.rfind('.');
-					const std::string stem =
-						(dot != std::string::npos)
-							? gf->output_file_path.substr(0, dot)
-							: gf->output_file_path;
-					if (gf->save_txt)
-						send_sentence_to_file(gf, result, to_flush,
-								      stem + ".txt", false, false);
-					if (gf->save_srt)
-						send_sentence_to_file(gf, result, to_flush,
-								      stem + ".srt", true, true);
+				// BOSSCAT — feed the finalized sentence to the global SRT
+				// session (combined + per-source files). The session only
+				// collects while a recording/stream is active and writes the
+				// files on stop, named after the recording.
+				if (gf->save_to_file &&
+				    (gf->srt_combined || gf->srt_per_source) &&
+				    srt_session_active()) {
+					srt_session_add_cue(gf, result.start_timestamp_ms,
+							    result.end_timestamp_ms, to_flush,
+							    gf->caption_label_text,
+							    gf->caption_label_enabled,
+							    gf->srt_combined, gf->srt_per_source,
+							    gf->output_directory, "");
 				}
+			}
+		}
 
-				// Write to auto-SRT if a recording session file is open.
-				// Do NOT gate on obs_frontend_recording_active(): whisper's
-				// processing latency means sentences often arrive after
-				// RECORDING_STOPPING, but the file path is only set between
-				// RECORDING_STARTED and RECORDING_STOPPED, so it is the
-				// correct guard.
-				if (gf->auto_srt_with_recording &&
-				    !gf->auto_srt_file_path.empty()) {
-					// Zero timecodes to recording start.
-					DetectionResultWithText rec_result = result;
-					uint64_t base = gf->recording_start_ts;
-					rec_result.start_timestamp_ms =
-						result.start_timestamp_ms > base
-							? result.start_timestamp_ms - base
-							: 0;
-					rec_result.end_timestamp_ms =
-						result.end_timestamp_ms > base
-							? result.end_timestamp_ms - base
-							: 0;
-					size_t was_num = gf->sentence_number;
-					gf->sentence_number = gf->auto_srt_sentence_number;
-					send_sentence_to_file(gf, rec_result, to_flush,
-							      gf->auto_srt_file_path, true, true);
-					gf->auto_srt_sentence_number = gf->sentence_number;
-					gf->sentence_number = was_num;
-				}
+		// BOSSCAT — translated SRT output. Local translation produces full
+		// translated sentences, so add them directly with the BCP 47 target
+		// language code appended to the generated filenames.
+		if (translation_type == LOCAL_TRANSLATION && gf->srt_translated &&
+		    gf->save_to_file && (gf->srt_combined || gf->srt_per_source) &&
+		    srt_session_active() && result.result == DETECTION_RESULT_SPEECH &&
+		    !text.empty()) {
+			auto it = language_codes_to_whisper.find(gf->target_lang);
+			std::string code =
+				(it != language_codes_to_whisper.end()) ? it->second : gf->target_lang;
+			if (!code.empty()) {
+				srt_session_add_cue(gf, result.start_timestamp_ms,
+						    result.end_timestamp_ms, text,
+						    gf->caption_label_text,
+						    gf->caption_label_enabled, gf->srt_combined,
+						    gf->srt_per_source, gf->output_directory, code);
 			}
 		}
 #ifdef ENABLE_WEBVTT
@@ -734,22 +730,28 @@ void remove_all_webvtt_outputs(std::unique_lock<std::mutex> & /*active_outputs_l
 }
 #endif
 
+// BOSSCAT — push any trailing partial sentence (one not ended by punctuation)
+// into the global SRT session before it finalizes the files on stop.
+static void flush_trailing_sentence_to_srt_session(struct transcription_filter_data *gf_)
+{
+	if (!gf_->save_to_file || (!gf_->srt_combined && !gf_->srt_per_source))
+		return;
+	if (!srt_session_active() || gf_->sentence_context_buffer.empty())
+		return;
+	uint64_t t = now_ms();
+	srt_session_add_cue(gf_, t, t, gf_->sentence_context_buffer, gf_->caption_label_text,
+			    gf_->caption_label_enabled, gf_->srt_combined, gf_->srt_per_source,
+			    gf_->output_directory, "");
+	gf_->sentence_context_buffer.clear();
+}
+
 /**
- * @brief Callback function to handle recording state changes in OBS.
+ * @brief Callback function to handle recording/streaming state changes in OBS.
  *
- * This function is triggered by OBS frontend events related to recording state changes.
- * It performs actions based on whether the recording is starting or stopping.
- *
- * @param event The OBS frontend event indicating the recording state change.
- * @param data Pointer to user data, expected to be a struct transcription_filter_data.
- *
- * When the recording is starting:
- * - If saving SRT files and saving only while recording is enabled, it resets the SRT file,
- *   truncates the existing file, and initializes the sentence number and start timestamp.
- *
- * When the recording is stopping:
- * - If saving only while recording or renaming the file to match the recording is not enabled, it returns immediately.
- * - Otherwise, it renames the output file to match the recording file name with the appropriate extension.
+ * Manages WebVTT outputs, clears the per-filter sentence buffer at session
+ * start, and flushes any trailing partial sentence into the global SRT session
+ * at session stop. The SRT files themselves are written by the global session
+ * in caption-dock.cpp.
  */
 void recording_state_callback(enum obs_frontend_event event, void *data)
 {
@@ -760,182 +762,29 @@ void recording_state_callback(enum obs_frontend_event event, void *data)
 		add_webvtt_output(*gf_, OBSOutputAutoRelease{obs_frontend_get_recording_output()},
 				  transcription_filter_data::webvtt_output_type::Recording);
 #endif
-		if (gf_->save_srt && gf_->save_only_while_recording &&
-		    gf_->output_file_path != "") {
-			obs_log(gf_->log_level, "Recording started. Resetting srt file.");
-			// truncate file if it exists
-			if (std::ifstream(gf_->output_file_path)) {
-				std::ofstream output_file(gf_->output_file_path,
-							  std::ios::out | std::ios::trunc);
-				output_file.close();
-			}
-			gf_->sentence_number = 1;
-			gf_->start_timestamp_ms = now_ms();
-		}
-
-		// BOSSCAT Layer 5 — auto-SRT per recording.
-		if (gf_->auto_srt_with_recording) {
-			gf_->recording_start_ts = now_ms();
-			gf_->auto_srt_sentence_number = 1;
-			gf_->sentence_context_buffer.clear();
-			// Sanitize label for use in filename.
-			std::string fileSuffix;
-			{
-				std::string lbl = gf_->caption_label_text;
-				for (char &c : lbl) {
-					if (c == '/' || c == '\\' || c == ':' || c == '*' ||
-					    c == '?' || c == '"' || c == '<' || c == '>' ||
-					    c == '|' || c == ' ')
-						c = '_';
-				}
-				while (!lbl.empty() &&
-				       (lbl.back() == '_' || lbl.back() == '.'))
-					lbl.pop_back();
-				if (!lbl.empty())
-					fileSuffix = "_" + lbl;
-			}
-			// Directory mode: temp file in the output folder.
-			// Specify mode: temp next to configured path (or /tmp fallback).
-			std::string base = !gf_->output_directory.empty()
-						   ? gf_->output_directory + "/tmp_rec"
-						   : (!gf_->output_file_path.empty()
-							      ? gf_->output_file_path
-							      : "/tmp/bosscat-localvocal-rec");
-			auto dot = base.rfind('.');
-			std::string stem = (dot != std::string::npos) ? base.substr(0, dot) : base;
-			gf_->auto_srt_file_path = stem + "_" +
-						  std::to_string(gf_->recording_start_ts) +
-						  fileSuffix + ".srt";
-			obs_log(gf_->log_level, "auto_srt: opening %s",
-				gf_->auto_srt_file_path.c_str());
-			std::ofstream f(gf_->auto_srt_file_path, std::ios::out | std::ios::trunc);
-			f.close();
-		}
+		// BOSSCAT — start a fresh sentence buffer; the global SRT session
+		// (caption-dock.cpp) handles file creation and naming.
+		gf_->sentence_context_buffer.clear();
 	} else if (event == OBS_FRONTEND_EVENT_RECORDING_STOPPING) {
 #ifdef ENABLE_WEBVTT
 		remove_webvtt_output(*gf_,
 				     OBSOutputAutoRelease{obs_frontend_get_recording_output()});
 #endif
-		// Flush any partial sentence still in the buffer to the auto-SRT file.
-		if (gf_->auto_srt_with_recording && !gf_->auto_srt_file_path.empty() &&
-		    !gf_->sentence_context_buffer.empty()) {
-			DetectionResultWithText flush_result;
-			flush_result.result = DETECTION_RESULT_SPEECH;
-			flush_result.start_timestamp_ms = 0;
-			flush_result.end_timestamp_ms = now_ms() > gf_->recording_start_ts
-							     ? now_ms() - gf_->recording_start_ts
-							     : 0;
-			size_t was_num = gf_->sentence_number;
-			gf_->sentence_number = gf_->auto_srt_sentence_number;
-			send_sentence_to_file(gf_, flush_result, gf_->sentence_context_buffer,
-					      gf_->auto_srt_file_path, true, true);
-			gf_->auto_srt_sentence_number = gf_->sentence_number;
-			gf_->sentence_number = was_num;
-			gf_->sentence_context_buffer.clear();
-		}
-	} else if (event == OBS_FRONTEND_EVENT_RECORDING_STOPPED) {
-		// BOSSCAT Layer 5 — rename auto-SRT to match the final recording filename.
-		if (gf_->auto_srt_with_recording && !gf_->auto_srt_file_path.empty()) {
-			namespace fs = std::filesystem;
-			char *recFile = obs_frontend_get_last_recording();
-			if (recFile && strlen(recFile) > 0) {
-				fs::path recPath(recFile);
-				// Reproduce the same label suffix used when the temp file was created.
-				std::string fileSuffix;
-				{
-					std::string lbl = gf_->caption_label_text;
-					for (char &c : lbl) {
-						if (c == '/' || c == '\\' || c == ':' ||
-						    c == '*' || c == '?' || c == '"' ||
-						    c == '<' || c == '>' || c == '|' ||
-						    c == ' ')
-							c = '_';
-					}
-					while (!lbl.empty() &&
-					       (lbl.back() == '_' || lbl.back() == '.'))
-						lbl.pop_back();
-					if (!lbl.empty())
-						fileSuffix = "_" + lbl;
-				}
-				// Naming: RecordingTitle.srt (no label) or RecordingTitle_Label.srt
-				std::string destName = recPath.stem().string() + fileSuffix + ".srt";
-				// Directory mode: keep in output folder; else place next to recording.
-				fs::path srtDest = !gf_->output_directory.empty()
-							   ? fs::path(gf_->output_directory) / destName
-							   : recPath.parent_path() / destName;
-				try {
-					if (fs::exists(gf_->auto_srt_file_path)) {
-						fs::rename(gf_->auto_srt_file_path, srtDest);
-						obs_log(gf_->log_level, "auto_srt: renamed to %s",
-							srtDest.c_str());
-					}
-				} catch (const fs::filesystem_error &e) {
-					obs_log(LOG_ERROR, "auto_srt rename error: %s", e.what());
-				}
-			}
-			if (recFile)
-				bfree(recFile);
-			gf_->auto_srt_file_path.clear();
-		}
-
-		if (!gf_->save_only_while_recording || !gf_->rename_file_to_match_recording) {
-			return;
-		}
-
-		{
-			namespace fs = std::filesystem;
-
-			char *recordingFileName = obs_frontend_get_last_recording();
-			if (!recordingFileName || strlen(recordingFileName) == 0) {
-				if (recordingFileName)
-					bfree(recordingFileName);
-				return;
-			}
-			fs::path recPath(recordingFileName);
-			bfree(recordingFileName);
-
-			// Derive stem (strip extension if present) from configured output path.
-			auto dot = gf_->output_file_path.rfind('.');
-			std::string stem = (dot != std::string::npos)
-						    ? gf_->output_file_path.substr(0, dot)
-						    : gf_->output_file_path;
-
-			// Directory mode files are handled via auto_srt on recording stop.
-			if (stem.empty())
-				return;
-
-			// Specify mode: keep next to recording (or in folder if directory set).
-			fs::path destDir = !gf_->output_directory.empty()
-						   ? fs::path(gf_->output_directory)
-						   : recPath.parent_path();
-
-			try {
-				if (gf_->save_srt) {
-					fs::path src(stem + ".srt");
-					if (fs::exists(src))
-						fs::rename(src,
-							   destDir / (recPath.stem().string() + ".srt"));
-				}
-				if (gf_->save_txt) {
-					fs::path src(stem + ".txt");
-					if (fs::exists(src))
-						fs::rename(src,
-							   destDir / (recPath.stem().string() + ".txt"));
-				}
-			} catch (const fs::filesystem_error &e) {
-				obs_log(LOG_ERROR, "Error renaming output file - %s", e.what());
-			}
-		}
+		// BOSSCAT — flush any trailing partial sentence into the SRT session.
+		flush_trailing_sentence_to_srt_session(gf_);
 	} else if (event == OBS_FRONTEND_EVENT_STREAMING_STARTING) {
 #ifdef ENABLE_WEBVTT
 		add_webvtt_output(*gf_, OBSOutputAutoRelease{obs_frontend_get_streaming_output()},
 				  transcription_filter_data::webvtt_output_type::Streaming);
 #endif
+		gf_->sentence_context_buffer.clear();
 	} else if (event == OBS_FRONTEND_EVENT_STREAMING_STOPPING) {
 #ifdef ENABLE_WEBVTT
 		remove_webvtt_output(*gf_,
 				     OBSOutputAutoRelease{obs_frontend_get_streaming_output()});
 #endif
+		// BOSSCAT — flush any trailing partial sentence into the SRT session.
+		flush_trailing_sentence_to_srt_session(gf_);
 	}
 }
 

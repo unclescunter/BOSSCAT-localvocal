@@ -231,8 +231,11 @@ struct transcription_filter_data {
 	bool save_txt = false;
 	std::string txt_file_path;
 	std::string srt_file_path;
-	std::string output_directory;          // directory mode: folder for generated files
-	bool specify_output_filename = false;  // when true, use explicit output_file_path instead
+	std::string output_directory;          // folder for generated files ("" = next to recording)
+	bool specify_output_filename = false;  // (legacy, unused in SRT-session model)
+	bool srt_combined = false;             // include this source in the combined .srt
+	bool srt_per_source = false;           // also write this source's own .srt
+	bool srt_translated = false;           // also write translated .srt (BCP 47 code appended)
 	bool auto_srt_with_recording = false;
 	std::string auto_srt_file_path;   // active auto-SRT path (temp during recording)
 	uint64_t recording_start_ts = 0;  // ms, set on recording start for zeroed SRT timecodes
