@@ -190,33 +190,12 @@ private:
 };
 
 // ---------------------------------------------------------------------------
-// OBS frontend event callback
-// Dock creation is deferred to OBS_FRONTEND_EVENT_FINISHED_LOADING.
-// obs_module_load fires before the main window is fully shown — calling
-// addDockWidget at that point produces a dock that never appears.
+// OBS frontend event callback + dock registration
 // ---------------------------------------------------------------------------
 static QPointer<CaptionContentWidget> g_content;
 
 static void frontend_event_cb(enum obs_frontend_event event, void * /*data*/)
 {
-	if (event == OBS_FRONTEND_EVENT_FINISHED_LOADING) {
-		auto *main_window =
-			static_cast<QMainWindow *>(obs_frontend_get_main_window());
-		if (!main_window) {
-			obs_log(LOG_WARNING,
-				"caption_dock: no main window at FINISHED_LOADING");
-			return;
-		}
-
-		g_content = new CaptionContentWidget(nullptr);
-
-		obs_frontend_add_dock_by_id("BosscatCaptionDock",
-					    obs_module_text("caption_dock_title"),
-					    g_content);
-
-		obs_log(LOG_INFO, "BOSSCAT caption dock initialized");
-	}
-
 	if (event == OBS_FRONTEND_EVENT_SCENE_CHANGED && g_content)
 		g_content->refreshCaptions();
 }
@@ -226,6 +205,16 @@ static void frontend_event_cb(enum obs_frontend_event event, void * /*data*/)
 // ---------------------------------------------------------------------------
 void caption_dock_init()
 {
+	// Create the content widget and register the dock with OBS.
+	// obs_frontend_add_dock_by_id is the standard plugin API — it creates
+	// the QDockWidget, adds it to the main window, and wires up the Docks
+	// menu toggle entry. Call it here (module load) as most plugins do.
+	g_content = new CaptionContentWidget(nullptr);
+	obs_frontend_add_dock_by_id("BosscatCaptionDock",
+				    obs_module_text("caption_dock_title"),
+				    g_content);
+	obs_log(LOG_INFO, "BOSSCAT caption dock initialized");
+
 	obs_frontend_add_event_callback(frontend_event_cb, nullptr);
 }
 
