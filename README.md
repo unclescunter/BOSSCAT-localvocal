@@ -1,52 +1,17 @@
-## Repo sponsors: [Recall.ai](https://www.recall.ai/product/desktop-recording-sdk?utm_source=github&utm_medium=sponsorship&utm_campaign=royshil-obs-localvocal) - API for desktop recording
 
-If you’re looking for a hosted desktop recording API, consider checking out [Recall.ai](https://www.recall.ai/product/desktop-recording-sdk?utm_source=github&utm_medium=sponsorship&utm_campaign=royshil-obs-localvocal), an API that records Zoom, Google Meet, Microsoft Teams, in-person meetings, and more.
+# LocalVocal - Bosscat flavour - Speech AI assistant OBS Plugin
 
-# LocalVocal - Speech AI assistant OBS Plugin
-
-<div align="center">
-
-[![GitHub](https://img.shields.io/github/license/locaal-ai/obs-localvocal)](https://github.com/locaal-ai/obs-localvocal/blob/main/LICENSE)
-[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/locaal-ai/obs-localvocal/push.yaml)](https://github.com/locaal-ai/obs-localvocal/actions/workflows/push.yaml)
-[![Total downloads](https://img.shields.io/github/downloads/locaal-ai/obs-localvocal/total)](https://github.com/locaal-ai/obs-localvocal/releases)
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/locaal-ai/obs-localvocal)](https://github.com/locaal-ai/obs-localvocal/releases)
-[![GitHub stars](https://badgen.net/github/stars/locaal-ai/obs-localvocal)](https://GitHub.com/locaal-ai/obs-localvocal/stargazers/)
-<br/>
-</div>
-
-## Downloads
-
-### Windows
-
-OS | Generic (x86_64) | NVidia (x86_64) | AMD (x86_64)
-:-:|:-------:|:------:|:---:
-Windows 10/11 | [![Static Badge](https://img.shields.io/badge/Windows%20(generic)-0078d6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/locaal-ai/obs-localvocal/releases/download/0.6.2/obs-localvocal-0.6.2-windows-x64-generic-Installer.exe) | [![Static Badge](https://img.shields.io/badge/Windows%20(NVidia)-0078d6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/locaal-ai/obs-localvocal/releases/download/0.6.2/obs-localvocal-0.6.2-windows-x64-nvidia-Installer.exe) | [![Static Badge](https://img.shields.io/badge/Windows%20(AMD)-0078d6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/locaal-ai/obs-localvocal/releases/download/0.6.2/obs-localvocal-0.6.2-windows-x64-amd-Installer.exe)
-
-### Linux
-
-OS | Generic (x86_64) | NVidia (x86_64) | AMD (x86_64)
-:-:|:-------:|:------:|:---:
-Ubuntu 22.04 (Jammy) .deb | [![Static Badge](https://img.shields.io/badge/Ubuntu%20(generic)-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/locaal-ai/obs-localvocal/releases/download/0.6.2/obs-localvocal-0.6.2-generic-x86_64-linux-gnu.deb) | [![Static Badge](https://img.shields.io/badge/Ubuntu%20(NVidia)-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/locaal-ai/obs-localvocal/releases/download/0.6.2/obs-localvocal-0.6.2-nvidia-x86_64-linux-gnu.deb) | [![Static Badge](https://img.shields.io/badge/Ubuntu%20(AMD)-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/locaal-ai/obs-localvocal/releases/download/0.6.2/obs-localvocal-0.6.2-amd-x86_64-linux-gnu.deb)
-
-### MacOS
-
-MacOS | Intel x86_64 | ARM64 (Apple silicon - M1/M2/M3/M4)
-:----:|:-----:|:------------------:
-Generic* | [![Static Badge](https://img.shields.io/badge/mac%20OS%20Intel-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/locaal-ai/obs-localvocal/releases/download/0.6.2/obs-localvocal-0.6.2-macos-embedded-x86_64.pkg) | [![Static Badge](https://img.shields.io/badge/mac%20OS%20ARM64-0a0a0a?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/locaal-ai/obs-localvocal/releases/download/0.6.2/obs-localvocal-0.6.2-macos-embedded-arm64.pkg)
-12 (Monterey) | [![Static Badge](https://img.shields.io/badge/mac%20OS%2012%20Intel-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/locaal-ai/obs-localvocal/releases/download/0.6.2/obs-localvocal-0.6.2-macos-12-x86_64.pkg) | [![Static Badge](https://img.shields.io/badge/mac%20OS%2012%20ARM64-0a0a0a?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/locaal-ai/obs-localvocal/releases/download/0.6.2/obs-localvocal-0.6.2-macos-12-arm64.pkg)
-13 (Ventura) | [![Static Badge](https://img.shields.io/badge/mac%20OS%2013%20Intel-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/locaal-ai/obs-localvocal/releases/download/0.6.2/obs-localvocal-0.6.2-macos-13-x86_64.pkg) | [![Static Badge](https://img.shields.io/badge/mac%20OS%2013%20ARM64-0a0a0a?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/locaal-ai/obs-localvocal/releases/download/0.6.2/obs-localvocal-0.6.2-macos-13-arm64.pkg)
-14 (Sonoma) | [![Static Badge](https://img.shields.io/badge/mac%20OS%2014%20Intel-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/locaal-ai/obs-localvocal/releases/download/0.6.2/obs-localvocal-0.6.2-macos-14-x86_64.pkg) | [![Static Badge](https://img.shields.io/badge/mac%20OS%2014%20ARM64-0a0a0a?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/locaal-ai/obs-localvocal/releases/download/0.6.2/obs-localvocal-0.6.2-macos-14-arm64.pkg)
-15 (Sequoia) | [![Static Badge](https://img.shields.io/badge/mac%20OS%2015%20Intel-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/locaal-ai/obs-localvocal/releases/download/0.6.2/obs-localvocal-0.6.2-macos-15-x86_64.pkg) | [![Static Badge](https://img.shields.io/badge/mac%20OS%2015%20ARM64-0a0a0a?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/locaal-ai/obs-localvocal/releases/download/0.6.2/obs-localvocal-0.6.2-macos-15-arm64.pkg)
-
-*While variants for specific versions of MacOS _may_ work better on that version of MacOS, the Generic variant is likely the best option. See [MacOS Variants](#mac-os-variants) below for more details
-
-Check out the [latest releases](https://github.com/locaal-ai/obs-localvocal/releases) for downloads and install instructions.
 
 ## Introduction
 
-LocalVocal lets you transcribe, locally on your machine, speech into text and simultaneously translate to any language. ✅ No GPU required, ✅ no cloud costs, ✅ no network and ✅ no downtime! Privacy first - all data stays on your machine.
+LocalVocal - Bosscat flavour is a shameless copy of the original [LocalVocal](https://github.com/royshil/obs-localvocal) which lets you transcribe, locally on your machine, speech into text and (hopefully) simultaneously translate to any language. ✅ No GPU required, ✅ no cloud costs, ✅ no network and ✅ no downtime! Privacy first - all data stays on your machine.
+
+The plugin had a few limitations on linux and I hada claude subscription, this is all vibe coded "upgrades" so download and run at your own risk. ONLY tested on [Nobara](https://nobaraproject.org/) Linux which is a version of Fedora.
+It should build for you but YMMV.
 
 The plugin runs [OpenAI's Whisper](https://github.com/openai/whisper) to process real-time speech and predict a transcription, utilizing [Whisper.cpp](https://github.com/ggerganov/whisper.cpp) from [ggerganov](https://github.com/ggerganov) to run the model efficiently on CPUs and GPUs. Translation is done with [CTranslate2](https://github.com/OpenNMT/CTranslate2).
+
+Preserved tutorials from the original creator:
 
 ## Usage
 
@@ -90,17 +55,26 @@ Current Features:
 - Partial transcriptions for a streaming-captions experience
 - 100s of fine-tuned Whisper models for dozens of languages from HuggingFace
 
+## Features I talked claude into adding
+- A live view dock that prints all text in a scene into obs for the creator
+- A "mute subtitles" button on that dock tht hides all subtitles. -> I'm looking at making this link to the source's visibility.
+- Subtitle decay in seconds, line length and line limit all work on linux now, freetype2 just isn't capable of textwrapping itself
+- The ability to label separate inputs so avoid confusion if titles are the same colour
+- ***untested*** the ability to use a separate whisper server on a self defined networked device
+- actually builds for fedora now, shopuld build for others. there were a couple of quirks like having to ```export CFLAGS="-fPIC"
+export CXXFLAGS="-fPIC"``` or add ```-DCMAKE_POSITION_INDEPENDENT_CODE=ON``` 
+This should Todd Howard now just follow the build instructions.
+
+## Features that have changed
+- Muting audio sources no longer turns subtitles off, for that use audio source visibility. That should turn it off cleanly
+
+## Features I think I broke/will fix
+- Local translation with whisper, everything else works maybe this is just how I'm setting it up.
+
 ### Available Versions
 
-LocalVocal is available in multiple versions to cater to different hardware configurations and operating systems. Below is a brief explanation of the different versions you can download:
+LocalVocal -Bosscat Flavour is available on Linux in a "build-it-yourself" capacity. I will enver build for windows but anyone is free to do that if they want to. Sorry mac users I'm not sailing the money boat.
 
-- **Windows** (please ensure you have the [latest MSVC runtime](https://aka.ms/vs/17/release/vc_redist.x64.exe) installed)
-  - **generic**: This version runs on all systems. See [Generic variants](#generic-variants) for more details
-  - **NVidia**: This version is optimized for systems with NVIDIA GPUs. See [NVidia optimized variants](#nvidia-optimized-variants) for more details
-  - **AMD**: This version is optimized for systems with AMD GPUs. See [AMD optimized variants](#amd-optimized-variants) for more details
-- **MacOS**
-  - **Intel (x86_64)**: This version is for Mac computers with Intel processors. See [MacOS variants](#mac-os-variants)
-  - **Apple Silicon (arm64)**: This version is optimized for Mac computers with Apple Silicon (M1, M2, etc.) processors. See [MacOS variants](#mac-os-variants)
 - **Linux x86_64**: This version is for Linux systems with x86_64 architecture.
   - **generic**: This version runs on all systems. See [Generic variants](#generic-variants) for more details
   - **NVidia**: This version is optimized for systems with NVIDIA GPUs. See [NVidia optimized variants](#nvidia-optimized-variants) for more details
@@ -111,7 +85,7 @@ Make sure to download the version that matches your system's hardware and operat
 Whisper backends are now loaded dynamically when the plugin starts, which has 2 major benefits:
 
 * **Better CPU performance and compatibility** - Whisper can automatically select the best CPU backend that works on your system out of all the ones available. This means that the plugin can now make full use of newer CPUs with more features, as well as making it usable on even older hardware than before (prior to v0.5.0 it was assumed that users would have at least AVX2 capable CPUs)
-* **More stability** - If a backend is present that cannot be used on your system, either due to unavailable CPU features, missing dependencies, or something else, it will simply not be loaded instead of causing a crash
+* **More stability** - If a backend is present that cannot be used on your system, either due to unavailable CPU features, missing dependencies, or something else, it will simply not be loaded instead of causing a crash <- (UncleScunter: I hope)
 
 To ensure the plugin works "out-of-the-box", it is configured by default to use the CPU only (this is also the case for users upgrading from versions older than v0.5.0). This is to avoid immediate crashes on startup if for any reason your GPU cannot be used by one of the Whisper backends (e.g. the Metal backend on Apple just crashes if it is unable to allocate a buffer to load a model into)
 
@@ -149,24 +123,7 @@ These variants contain all the backends from the generic variant, plus a hipblas
 
 Please ensure you have a compatible AMD GPU driver installed
 
-#### Mac OS variants
-
-These variants come with the following backends available:
-* CPU
-  * The same x86_64 variants as listed in [Generic variants](#generic-variants) for Intel CPUs
-  * m1, m2/m3, and m4 variants for ARM CPUs
-* Accelerate - Used in conjunction with a CPU backend to accelerate processing speed
-* Metal - Uses the system's GPU for accelerated processing
-* CoreML - Special backend that uses Apple's CoreML instead of Whisper's normal model processing, running on either the Metal or CPU backends
-* Vulkan - For systems that can't use Metal to accelerate transcription on the GPU (likely most if not all Intel Macs), Vulkan is available as an alternative for using the GPU. To be able to use this backend, you must first install the [Vulkan SDK](https://vulkan.lunarg.com/sdk/home#mac). After doing so, you should see an additional Vulkan GPU device for each GPU available in the "Whisper backend configuration" section of the plugin filter settings.
-
-The Generic MacOS version embeds the Metal shaders into whisper.cpp as intermediate bytecode, which is compiled at runtime for the computer and GPU being used. This is probably the best version to use unless you have a reason to use the others, and may be able to take advantage of newer features in Metal 4 in MacOS Tahoe
-
-Variants with Metal shaders pre-compiled for specific [Metal API versions](https://support.apple.com/en-gb/102894) which may or may not work slightly better on the appropriate version of MacOS:
-* MacOS 12 - Metal 2.4
-* MacOS 13 - Metal 3.0
-* MacOS 14 - Metal 3.1
-* MacOS 15 - Metal 3.2
+I recommend [Nobara](https://nobaraproject.org), it has a great community and some custom ROCm libraries that are maintained by the community. You might need to make a symlink here or there but overall it's been easier to set up AI stuff on [Nobara](https://nobaraproject.org) (A flavour of Fedora) than any other distro I've played with. 
 
 ### Models
 The plugin ships with the Tiny.en model, and will autonomously download other Whisper models through a dropdown.
@@ -214,7 +171,7 @@ sudo dnf install -y cmake ninja-build ccache gcc gcc-c++ git \
 
 #### 4. Set your GPU acceleration
 
-Set `ACCELERATION` to match your GPU — this is the most important choice:
+Set `ACCELERATION` to match your GPU - If this is wrong it will default to cpu and you won't be able to use your gpu for captioning:
 
 | Value | Use when | Benefit |
 |---|---|---|
@@ -227,6 +184,14 @@ export ACCELERATION=amd    # change to nvidia or generic as needed
 ```
 
 #### 5. Build
+
+Run the included script from the repo root:
+
+```sh
+./install.sh
+```
+
+Or for the people who like hard mode here's what the script does and you can do it too:
 
 All four of these are **required** — the build will fail if any are missing:
 
@@ -242,7 +207,7 @@ cmake -B build_x86_64 --preset linux-x86_64 \
 cmake --build build_x86_64 --target install
 ```
 
-> **Why `-fPIC` and `-DCMAKE_POSITION_INDEPENDENT_CODE=ON`?** Sub-dependencies (cpu_features, Whisper.cpp) build as static libraries linked into the final shared `.so`. Without position-independent code the linker fails at the last step with `relocation R_X86_64_32 ... recompile with -fPIC`. The env vars ensure the flag propagates into every sub-build that CMake spawns.
+> **Why `-fPIC` and `-DCMAKE_POSITION_INDEPENDENT_CODE=ON`?** Sub-dependencies (cpu_features, Whisper.cpp) build as static libraries linked into the final shared `.so`. Without position-independent code the linker fails at the last step with `relocation R_X86_64_32 ... recompile with -fPIC`. The env vars ensure the flag propagates into every sub-build that CMake spawns.  <- This specific issue was interesting to diagnose. Claude wanted to go into some deep system files and change cmake rather than just pass a variable. Careful out there.
 
 #### 6. Install to OBS
 
@@ -258,12 +223,6 @@ cp -r release/lib64/obs-plugins/obs-localvocal \
 
 cp -r release/share/obs/obs-plugins/obs-localvocal/. \
    ~/.config/obs-studio/plugins/obs-localvocal/data/
-```
-
-Or just run the included script from the repo root:
-
-```sh
-./install.sh
 ```
 
 The resulting layout should look like:
@@ -291,41 +250,19 @@ The resulting layout should look like:
     └── models/
 ```
 
-Restart OBS. The **BOSSCAT Captions** dock will appear under Docks.
+Restart OBS. The **BOSSCAT Captions** dock will appear under Docks. It currently spawns on the right side of the window, you can move it but it does spawn there every time. I'll change that but for the moment that's how it works.
 
 ---
 
 ### Packaging a .deb for Ubuntu
 
-> **IMPORTANT:** Build on Ubuntu, not Fedora. Binaries compiled on Fedora link against a newer glibc and a different libobs ABI than Ubuntu packages ship — they will fail to load with `GLIBC_2.4x not found` or missing OBS symbols. Clone this repo on the target Ubuntu machine, build it there, then run the packaging script.
-
-After building on Ubuntu, create the `.deb` with:
-
-```sh
-./package-deb.sh
-```
-
-The script stages all plugin files and dep `.so` files into the package, then creates a `postinst` that copies them into `~/.config/obs-studio/plugins/obs-localvocal/` for the installing user. Install the resulting `.deb` with:
-
-```sh
-sudo dpkg -i release/obs-localvocal-bosscat_0.6.2-bosscat1_amd64.deb
-```
-
-Remove with:
-
-```sh
-sudo dpkg -r obs-localvocal-bosscat
-```
-
-> Note: `sudo dpkg -i` installs to the home directory of the user who ran sudo (detected via `$SUDO_USER`). If the user cannot be determined, the script will print the path for a manual copy from `/usr/lib/obs-localvocal-bosscat/`.
-
----
+> **IMPORTANT:** I probably don't need to do this because the build script should work fine but if it gets requested I'll throw up a .deb packge. 
 
 ### Troubleshooting (Linux)
 
 **OBS says "plugin failed to load" with no detail**
 
-Run OBS from a terminal to see the real error:
+Run OBS from a terminal to see the error (Run OBS [in x11] like this with a bash script so that hotkeys work):
 
 ```sh
 QT_QPA_PLATFORM=xcb obs
@@ -333,14 +270,13 @@ QT_QPA_PLATFORM=xcb obs
 
 **`libamdhip64.so.6: cannot open shared object file`**
 
-Your system has a newer ROCm version (e.g. v7) but the plugin was linked against v6. One symlink fixes it:
+Your system has a different ROCm version (e.g. v7) but the plugin was linked against v6. One symlink to rule them all, change the number in ```libamdhip64.so.7``` in the following command for whichever version of `libamdhip64.so.*` you have :
 
 ```sh
 sudo ln -s /usr/lib64/libamdhip64.so.7 /usr/lib64/libamdhip64.so.6
 sudo ldconfig
 ```
 
-Adjust the version numbers to match what you actually have in `/usr/lib64/`.
 
 **`relocation R_X86_64_32 ... recompile with -fPIC`**
 
@@ -354,11 +290,13 @@ BOSSCAT has not been tested on macOS or Windows. The upstream obs-localvocal bui
 
 ---
 
-## Upstream Build Instructions
+## Upstream Build Instructions - [Royshil's original build instructions](https://github.com/royshil/obs-localvocal)
 
 The original obs-localvocal build documentation follows below for reference.
 
-The plugin was built and tested on Mac OSX (Intel & Apple silicon), Windows (with and without Nvidia CUDA) and Linux.
+The plugin was built and tested on Nobara Linux and nothing else. Download the [base plugin from royshil](https://github.com/royshil/obs-localvocal) for a more stable experience. I will be co-opting the flatpak build instructions below to provide a flatpak package soon enough.
+
+***ALL INSTRUCTIONS FOR MACOSX OR WINDOWS ARE UNSTESTED***
 
 Start by cloning this repo to a directory of your choice.
 
@@ -572,3 +510,12 @@ To build with cuda add `ACCELERATION` as an environment variable (with `cpu`, `h
 A collection of environment variables and tweaks that are useful when running local AI workloads on AMD GPUs with ROCm, gathered from real-world testing.
 
 **`HSA_OVERRIDE_GFX_VERSION=10.3.0`** — Some AMD GPUs (e.g. RX 6700 XT / RDNA2) are not on ROCm's official support list but work correctly when you tell ROCm which GFX architecture to treat them as. Without this, ROCm silently ignores the GPU and falls back to CPU. Set it persistently in your environment (`~/.bashrc` or `/etc/environment`) so it applies to any ML workload, not just this plugin.
+
+
+---
+
+## Don't expect update unless it breaks my end, you're a smart wombat if you made it this far
+
+##[TIP JAR](https://ko-fi.com/unclescunter)
+
+Big love out there 
