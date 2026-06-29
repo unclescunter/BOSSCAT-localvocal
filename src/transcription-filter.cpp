@@ -501,23 +501,13 @@ void transcription_filter_update(void *data, obs_data_t *s)
 			if (path && *path)
 				gf->output_file_path = path;
 		} else if (!gf->output_directory.empty()) {
-			// Base name is always "subtitles"; append the label when set so
-			// each filter in the same folder gets its own uniquely named file.
-			// e.g. "subtitles_Speaker1.srt", "subtitles_Speaker2.srt"
-			std::string label = gf->caption_label_text;
-			// Sanitize: replace filesystem-unsafe characters with underscores.
-			for (char &c : label) {
-				if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' ||
-				    c == '"' || c == '<' || c == '>' || c == '|' || c == ' ')
-					c = '_';
-			}
-			while (!label.empty() && (label.back() == '_' || label.back() == '.'))
-				label.pop_back();
-			std::string stem = label.empty() ? "subtitles" : "subtitles_" + label;
-			gf->output_file_path = gf->output_directory + "/" + stem;
-		}
-		if (gf->output_file_path.empty())
+			// Directory mode: no continuous file. All writing happens via the
+			// recording hooks (RECORDING_STARTED creates a temp SRT, STOPPED
+			// renames it to RecordingTitle[_Label].srt in the output folder).
+			gf->auto_srt_with_recording = true;
+		} else {
 			obs_log(gf->log_level, "output file path is empty, but selected to save");
+		}
 	}
 
 	if (new_buffered_output) {

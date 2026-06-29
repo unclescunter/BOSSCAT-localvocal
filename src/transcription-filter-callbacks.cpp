@@ -774,20 +774,37 @@ void recording_state_callback(enum obs_frontend_event event, void *data)
 			gf_->recording_start_ts = now_ms();
 			gf_->auto_srt_sentence_number = 1;
 			gf_->sentence_context_buffer.clear();
-			// Use a temp path next to the configured output or in /tmp.
-			std::string base = gf_->output_file_path;
-			if (base.empty())
-				base = "/tmp/bosscat-localvocal-rec";
-			// Strip extension and add _rec_<ts>.srt
+			// Sanitize label for use in filename.
+			std::string fileSuffix;
+			{
+				std::string lbl = gf_->caption_label_text;
+				for (char &c : lbl) {
+					if (c == '/' || c == '\\' || c == ':' || c == '*' ||
+					    c == '?' || c == '"' || c == '<' || c == '>' ||
+					    c == '|' || c == ' ')
+						c = '_';
+				}
+				while (!lbl.empty() &&
+				       (lbl.back() == '_' || lbl.back() == '.'))
+					lbl.pop_back();
+				if (!lbl.empty())
+					fileSuffix = "_" + lbl;
+			}
+			// Directory mode: temp file in the output folder.
+			// Specify mode: temp next to configured path (or /tmp fallback).
+			std::string base = !gf_->output_directory.empty()
+						   ? gf_->output_directory + "/tmp_rec"
+						   : (!gf_->output_file_path.empty()
+							      ? gf_->output_file_path
+							      : "/tmp/bosscat-localvocal-rec");
 			auto dot = base.rfind('.');
 			std::string stem = (dot != std::string::npos) ? base.substr(0, dot) : base;
-			gf_->auto_srt_file_path =
-				stem + "_rec_" + std::to_string(gf_->recording_start_ts) + ".srt";
+			gf_->auto_srt_file_path = stem + "_" +
+						  std::to_string(gf_->recording_start_ts) +
+						  fileSuffix + ".srt";
 			obs_log(gf_->log_level, "auto_srt: opening %s",
 				gf_->auto_srt_file_path.c_str());
-			// Truncate/create the file.
-			std::ofstream f(gf_->auto_srt_file_path,
-					std::ios::out | std::ios::trunc);
+			std::ofstream f(gf_->auto_srt_file_path, std::ios::out | std::ios::trunc);
 			f.close();
 		}
 	} else if (event == OBS_FRONTEND_EVENT_RECORDING_STOPPING) {
@@ -802,13 +819,29 @@ void recording_state_callback(enum obs_frontend_event event, void *data)
 			char *recFile = obs_frontend_get_last_recording();
 			if (recFile && strlen(recFile) > 0) {
 				fs::path recPath(recFile);
+				// Reproduce the same label suffix used when the temp file was created.
+				std::string fileSuffix;
+				{
+					std::string lbl = gf_->caption_label_text;
+					for (char &c : lbl) {
+						if (c == '/' || c == '\\' || c == ':' ||
+						    c == '*' || c == '?' || c == '"' ||
+						    c == '<' || c == '>' || c == '|' ||
+						    c == ' ')
+							c = '_';
+					}
+					while (!lbl.empty() &&
+					       (lbl.back() == '_' || lbl.back() == '.'))
+						lbl.pop_back();
+					if (!lbl.empty())
+						fileSuffix = "_" + lbl;
+				}
+				// Naming: RecordingTitle.srt (no label) or RecordingTitle_Label.srt
+				std::string destName = recPath.stem().string() + fileSuffix + ".srt";
 				// Directory mode: keep in output folder; else place next to recording.
-				fs::path srtDest =
-					!gf_->output_directory.empty()
-						? fs::path(gf_->output_directory) /
-							  (recPath.stem().string() + ".srt")
-						: recPath.parent_path() /
-							  (recPath.stem().string() + ".srt");
+				fs::path srtDest = !gf_->output_directory.empty()
+							   ? fs::path(gf_->output_directory) / destName
+							   : recPath.parent_path() / destName;
 				try {
 					if (fs::exists(gf_->auto_srt_file_path)) {
 						fs::rename(gf_->auto_srt_file_path, srtDest);
@@ -846,7 +879,11 @@ void recording_state_callback(enum obs_frontend_event event, void *data)
 						    ? gf_->output_file_path.substr(0, dot)
 						    : gf_->output_file_path;
 
-			// Directory mode: keep in folder; else next to recording.
+			// Directory mode files are handled via auto_srt on recording stop.
+			if (stem.empty())
+				return;
+
+			// Specify mode: keep next to recording (or in folder if directory set).
 			fs::path destDir = !gf_->output_directory.empty()
 						   ? fs::path(gf_->output_directory)
 						   : recPath.parent_path();
