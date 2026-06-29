@@ -515,10 +515,6 @@ void add_buffered_output_group_properties(obs_properties_t *ppts)
 				      MT_("caption_max_lines"), 1, 5, 1);
 	obs_properties_add_int_slider(buffered_output_group, "caption_decay_seconds",
 				      MT_("caption_decay_seconds"), 0, 60, 1);
-	obs_properties_add_bool(buffered_output_group, "caption_label_enabled",
-				MT_("caption_label_enabled"));
-	obs_properties_add_text(buffered_output_group, "caption_label_text",
-				MT_("caption_label_text"), OBS_TEXT_DEFAULT);
 }
 
 void add_advanced_group_properties(obs_properties_t *ppts, struct transcription_filter_data *gf)
@@ -601,6 +597,12 @@ void add_general_group_properties(obs_properties_t *ppts)
 	obs_properties_t *general_group = obs_properties_create();
 	obs_properties_add_group(ppts, "general_group", MT_("general_group"), OBS_GROUP_NORMAL,
 				 general_group);
+
+	// Label for this filter — shown as caption prefix and used as SRT filename stem.
+	obs_properties_add_bool(general_group, "caption_label_enabled",
+				MT_("caption_label_enabled"));
+	obs_properties_add_text(general_group, "caption_label_text", MT_("caption_label_text"),
+				OBS_TEXT_DEFAULT);
 
 	obs_property_t *subs_output =
 		obs_properties_add_list(general_group, "subtitle_sources", MT_("subtitle_sources"),

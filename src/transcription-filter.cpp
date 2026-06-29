@@ -501,7 +501,20 @@ void transcription_filter_update(void *data, obs_data_t *s)
 			if (path && *path)
 				gf->output_file_path = path;
 		} else if (!gf->output_directory.empty()) {
-			gf->output_file_path = gf->output_directory + "/subtitles";
+			// Use the caption label as the filename stem so each filter gets its
+			// own file; fall back to "subtitles" when no label is set.
+			std::string stem = gf->caption_label_text;
+			// Sanitize: replace filesystem-unsafe characters with underscores.
+			for (char &c : stem) {
+				if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' ||
+				    c == '"' || c == '<' || c == '>' || c == '|' || c == ' ')
+					c = '_';
+			}
+			while (!stem.empty() && (stem.back() == '_' || stem.back() == '.'))
+				stem.pop_back();
+			if (stem.empty())
+				stem = "subtitles";
+			gf->output_file_path = gf->output_directory + "/" + stem;
 		}
 		if (gf->output_file_path.empty())
 			obs_log(gf->log_level, "output file path is empty, but selected to save");
