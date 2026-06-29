@@ -210,13 +210,9 @@ static void frontend_event_cb(enum obs_frontend_event event, void * /*data*/)
 
 		g_content = new CaptionContentWidget(nullptr);
 
-		auto *dock = new QDockWidget(
-			obs_module_text("caption_dock_title"), main_window);
-		dock->setObjectName("BosscatCaptionDock");
-		dock->setWidget(g_content);
-		dock->setAllowedAreas(Qt::AllDockWidgetAreas);
-		main_window->addDockWidget(Qt::RightDockWidgetArea, dock);
-		dock->show();
+		obs_frontend_add_dock_by_id("BosscatCaptionDock",
+					    obs_module_text("caption_dock_title"),
+					    g_content);
 
 		obs_log(LOG_INFO, "BOSSCAT caption dock initialized");
 	}
