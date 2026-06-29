@@ -9,10 +9,10 @@
 #include <obs-module.h>
 #include <obs-frontend-api.h>
 
-#include <QDockWidget>
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QWidget>
+#include <QPointer>
 #include <QTimer>
 #include <QString>
 #include <QMainWindow>
@@ -84,22 +84,20 @@ static std::vector<std::pair<std::string, std::string>> get_all_captions()
 }
 
 // ---------------------------------------------------------------------------
-// The dock widget
+// The dock content widget.
+// Must be a plain QWidget — obs_frontend_add_dock_by_id wraps it in OBS's
+// own OBSDock (a QDockWidget subclass). Passing a QDockWidget here would
+// nest one dock inside another, breaking popout and title-bar behaviour.
 // ---------------------------------------------------------------------------
-class CaptionDockWidget : public QDockWidget {
+class CaptionDockWidget : public QWidget {
 public:
-	explicit CaptionDockWidget(QWidget *parent = nullptr)
-		: QDockWidget(obs_module_text("caption_dock_title"), parent)
+	explicit CaptionDockWidget(QWidget *parent = nullptr) : QWidget(parent)
 	{
-		setObjectName("BosscatCaptionDock");
-		setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
-
-		auto *container = new QWidget(this);
-		auto *layout = new QVBoxLayout(container);
+		auto *layout = new QVBoxLayout(this);
 		layout->setContentsMargins(4, 4, 4, 4);
 		layout->setSpacing(4);
 
-		captionLabel = new QLabel(container);
+		captionLabel = new QLabel(this);
 		captionLabel->setWordWrap(true);
 		captionLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
 		captionLabel->setTextFormat(Qt::PlainText);
@@ -108,8 +106,6 @@ public:
 
 		layout->addWidget(captionLabel);
 		layout->addStretch();
-		container->setLayout(layout);
-		setWidget(container);
 
 		refreshTimer = new QTimer(this);
 		connect(refreshTimer, &QTimer::timeout, this, &CaptionDockWidget::refreshCaptions);
@@ -142,8 +138,9 @@ private:
 
 // ---------------------------------------------------------------------------
 // OBS frontend event callback
+// QPointer auto-nulls if OBS destroys the widget before we unregister.
 // ---------------------------------------------------------------------------
-static CaptionDockWidget *g_dock = nullptr;
+static QPointer<CaptionDockWidget> g_dock;
 
 static void frontend_event_cb(enum obs_frontend_event event, void * /*data*/)
 {
@@ -156,13 +153,13 @@ static void frontend_event_cb(enum obs_frontend_event event, void * /*data*/)
 // ---------------------------------------------------------------------------
 void caption_dock_init()
 {
-	auto *main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	if (!main_window) {
+	if (!obs_frontend_get_main_window()) {
 		obs_log(LOG_WARNING, "caption_dock_init: no main window, dock skipped");
 		return;
 	}
 
-	g_dock = new CaptionDockWidget(main_window);
+	// No parent — obs_frontend_add_dock_by_id takes ownership and re-parents.
+	g_dock = new CaptionDockWidget(nullptr);
 
 	if (!obs_frontend_add_dock_by_id("BosscatCaptionDock",
 					 obs_module_text("caption_dock_title"), g_dock)) {
