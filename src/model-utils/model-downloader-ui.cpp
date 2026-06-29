@@ -22,7 +22,7 @@ ModelDownloader::ModelDownloader(const ModelInfo &model_info,
 	: QDialog(parent),
 	  download_finished_callback(download_finished_callback_)
 {
-	this->setWindowTitle("LocalVocal: Downloading model...");
+	this->setWindowTitle("LocalVocal-Bosscat-Flavour: Downloading model...");
 	this->setWindowFlags(Qt::Dialog | Qt::WindowTitleHint | Qt::CustomizeWindowHint);
 	this->setFixedSize(300, 100);
 	// Bring the dialog to the front

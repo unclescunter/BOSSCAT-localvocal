@@ -20,9 +20,9 @@ void transcription_filter_show(void *data);
 void transcription_filter_hide(void *data);
 
 const char *const PLUGIN_INFO_TEMPLATE =
-	"<a href=\"https://github.com/locaal-ai/obs-localvocal/\">LocalVocal</a> (%1) by "
-	"<a href=\"https://github.com/locaal-ai\">Locaal AI</a> ❤️ "
-	"<a href=\"https://locaal.ai\">Support & Follow</a>";
+	"LocalVocal-Bosscat-Flavour (%1) — a BOSSCAT edition of "
+	"<a href=\"https://github.com/locaal-ai/obs-localvocal/\">LocalVocal</a> by "
+	"<a href=\"https://github.com/locaal-ai\">Locaal AI</a> ❤️";
 
 const char *const SUPPRESS_SENTENCES_DEFAULT =
 	"Thank you for watching\nPlease like and subscribe\n"

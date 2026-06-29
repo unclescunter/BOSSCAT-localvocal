@@ -353,7 +353,7 @@ void transcription_filter_update(void *data, obs_data_t *s)
 {
 	struct transcription_filter_data *gf =
 		static_cast<struct transcription_filter_data *>(data);
-	obs_log(gf->log_level, "LocalVocal filter update");
+	obs_log(gf->log_level, "LocalVocal-Bosscat-Flavour filter update");
 
 	gf->log_level = (int)obs_data_get_int(s, "log_level");
 	gf->vad_mode = (int)obs_data_get_int(s, "vad_mode");
@@ -785,7 +785,7 @@ void transcription_filter_update(void *data, obs_data_t *s)
 
 void *transcription_filter_create(obs_data_t *settings, obs_source_t *filter)
 {
-	obs_log(LOG_INFO, "LocalVocal filter create");
+	obs_log(LOG_INFO, "LocalVocal-Bosscat-Flavour filter create");
 
 	void *data = bmalloc(sizeof(struct transcription_filter_data));
 	struct transcription_filter_data *gf = new (data) transcription_filter_data();
@@ -852,9 +852,9 @@ void *transcription_filter_create(obs_data_t *settings, obs_source_t *filter)
 	const char *subtitle_sources = obs_data_get_string(settings, "subtitle_sources");
 	if (subtitle_sources == nullptr || strlen(subtitle_sources) == 0 ||
 	    strcmp(subtitle_sources, "none") == 0 || strcmp(subtitle_sources, "(null)") == 0) {
-		obs_log(gf->log_level, "Create text source");
-		gf->text_source_name = "LocalVocal Subtitles";
-		obs_data_set_string(settings, "subtitle_sources", "LocalVocal Subtitles");
+		// No output source selected. Do NOT create one or touch the user's
+		// scene collection — simply leave the primary output unset.
+		gf->text_source_name = "";
 	} else {
 		gf->text_source_name = subtitle_sources;
 	}
@@ -875,7 +875,6 @@ void *transcription_filter_create(obs_data_t *settings, obs_source_t *filter)
 		}
 		obs_data_array_release(arr);
 	}
-	create_obs_text_source_if_needed();
 	obs_log(gf->log_level, "clear paths and whisper context");
 	gf->whisper_model_file_currently_loaded = "";
 	gf->output_file_path = std::string("");

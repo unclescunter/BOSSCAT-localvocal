@@ -138,7 +138,7 @@ public:
 		captionLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
 		captionLabel->setTextFormat(Qt::PlainText);
 		captionLabel->setStyleSheet("QLabel { font-size: 13pt; }");
-		captionLabel->setText("(no localvocal filters active)");
+		captionLabel->setText("(no LocalVocal-Bosscat-Flavour filters active)");
 		captionLabel->setMinimumHeight(60);
 
 		muteButton = new QPushButton(this);
@@ -163,7 +163,7 @@ public:
 			return; // label already set to "(subtitles muted)"
 		auto rows = get_all_captions();
 		if (rows.empty()) {
-			captionLabel->setText("(no localvocal filters active)");
+			captionLabel->setText("(no LocalVocal-Bosscat-Flavour filters active)");
 			return;
 		}
 		QString text;
