@@ -501,19 +501,19 @@ void transcription_filter_update(void *data, obs_data_t *s)
 			if (path && *path)
 				gf->output_file_path = path;
 		} else if (!gf->output_directory.empty()) {
-			// Use the caption label as the filename stem so each filter gets its
-			// own file; fall back to "subtitles" when no label is set.
-			std::string stem = gf->caption_label_text;
+			// Base name is always "subtitles"; append the label when set so
+			// each filter in the same folder gets its own uniquely named file.
+			// e.g. "subtitles_Speaker1.srt", "subtitles_Speaker2.srt"
+			std::string label = gf->caption_label_text;
 			// Sanitize: replace filesystem-unsafe characters with underscores.
-			for (char &c : stem) {
+			for (char &c : label) {
 				if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' ||
 				    c == '"' || c == '<' || c == '>' || c == '|' || c == ' ')
 					c = '_';
 			}
-			while (!stem.empty() && (stem.back() == '_' || stem.back() == '.'))
-				stem.pop_back();
-			if (stem.empty())
-				stem = "subtitles";
+			while (!label.empty() && (label.back() == '_' || label.back() == '.'))
+				label.pop_back();
+			std::string stem = label.empty() ? "subtitles" : "subtitles_" + label;
 			gf->output_file_path = gf->output_directory + "/" + stem;
 		}
 		if (gf->output_file_path.empty())
