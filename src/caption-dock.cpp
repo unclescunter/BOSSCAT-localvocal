@@ -78,13 +78,59 @@ static std::vector<std::pair<std::string, std::string>> get_all_captions()
 	return out;
 }
 
-// Returns the host source name of the first registered filter (for Settings button).
-static std::string get_first_host_source_name()
+// Returns all registered host source names (for mute toggle).
+static std::vector<std::string> get_all_host_source_names()
 {
+	std::vector<std::string> names;
 	std::lock_guard<std::mutex> lock(g_registry_mutex);
-	if (!g_registry.empty())
-		return g_registry[0].host_source_name;
-	return "";
+	for (const auto &entry : g_registry)
+		names.push_back(entry.host_source_name);
+	return names;
+}
+
+// Enable or disable every localvocal filter across all registered sources.
+static void set_all_filters_enabled(bool enabled)
+{
+	for (const auto &src_name : get_all_host_source_names()) {
+		obs_source_t *source = obs_get_source_by_name(src_name.c_str());
+		if (!source)
+			continue;
+		obs_source_enum_filters(
+			source,
+			[](obs_source_t *, obs_source_t *filter, void *data) {
+				const char *id = obs_source_get_id(filter);
+				if (id &&
+				    strcmp(id, "transcription_filter_audio_filter") == 0)
+					obs_source_set_enabled(
+						filter,
+						*static_cast<bool *>(data));
+			},
+			&enabled);
+		obs_source_release(source);
+	}
+}
+
+// Returns true if ALL registered localvocal filters are currently enabled.
+static bool all_filters_enabled()
+{
+	bool all_on = true;
+	for (const auto &src_name : get_all_host_source_names()) {
+		obs_source_t *source = obs_get_source_by_name(src_name.c_str());
+		if (!source)
+			continue;
+		obs_source_enum_filters(
+			source,
+			[](obs_source_t *, obs_source_t *filter, void *data) {
+				const char *id = obs_source_get_id(filter);
+				if (id &&
+				    strcmp(id, "transcription_filter_audio_filter") == 0 &&
+				    !obs_source_enabled(filter))
+					*static_cast<bool *>(data) = false;
+			},
+			&all_on);
+		obs_source_release(source);
+	}
+	return all_on;
 }
 
 // ---------------------------------------------------------------------------
@@ -106,12 +152,15 @@ public:
 		captionLabel->setText("(no localvocal filters active)");
 		captionLabel->setMinimumHeight(60);
 
-		settingsButton = new QPushButton(tr("Filter Settings"), this);
-		connect(settingsButton, &QPushButton::clicked, this,
-			&CaptionContentWidget::openFilterSettings);
+		muteButton = new QPushButton(this);
+		muteButton->setCheckable(true);
+		muteButton->setChecked(false);
+		updateMuteButtonLabel(false);
+		connect(muteButton, &QPushButton::toggled, this,
+			&CaptionContentWidget::onMuteToggled);
 
 		layout->addWidget(captionLabel, 1);
-		layout->addWidget(settingsButton, 0);
+		layout->addWidget(muteButton, 0);
 
 		refreshTimer = new QTimer(this);
 		connect(refreshTimer, &QTimer::timeout, this,
@@ -136,24 +185,34 @@ public:
 						   : QString::fromStdString(row.second);
 		}
 		captionLabel->setText(text);
+
+		// Keep button state in sync if filters were toggled externally.
+		bool muted = !all_filters_enabled();
+		if (muted != muteButton->isChecked()) {
+			muteButton->blockSignals(true);
+			muteButton->setChecked(muted);
+			updateMuteButtonLabel(muted);
+			muteButton->blockSignals(false);
+		}
 	}
 
 private slots:
-	void openFilterSettings()
+	void onMuteToggled(bool muted)
 	{
-		std::string src_name = get_first_host_source_name();
-		if (src_name.empty())
-			return;
-		obs_source_t *src = obs_get_source_by_name(src_name.c_str());
-		if (!src)
-			return;
-		obs_frontend_open_source_filters(src);
-		obs_source_release(src);
+		set_all_filters_enabled(!muted);
+		updateMuteButtonLabel(muted);
+		if (muted)
+			captionLabel->setText("(subtitles muted)");
 	}
 
 private:
+	void updateMuteButtonLabel(bool muted)
+	{
+		muteButton->setText(muted ? tr("Unmute Subtitles") : tr("Mute Subtitles"));
+	}
+
 	QLabel *captionLabel = nullptr;
-	QPushButton *settingsButton = nullptr;
+	QPushButton *muteButton = nullptr;
 	QTimer *refreshTimer = nullptr;
 };
 
