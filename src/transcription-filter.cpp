@@ -395,33 +395,23 @@ void transcription_filter_update(void *data, obs_data_t *s)
 	}
 #endif
 	gf->save_to_file = obs_data_get_bool(s, "file_output_enable");
+	gf->save_srt = obs_data_get_bool(s, "subtitle_save_srt");
+	gf->truncate_output_file = obs_data_get_bool(s, "truncate_output_file");
 	gf->save_only_while_recording = obs_data_get_bool(s, "only_while_recording");
-	gf->truncate_output_file = false;
-	gf->rename_file_to_match_recording = false;
-	// BOSSCAT Layer 5 — directory-based file output
+	gf->rename_file_to_match_recording =
+		obs_data_get_bool(s, "rename_file_to_match_recording");
+	// BOSSCAT Layer 5 — sentence-buffered file output
 	gf->save_txt = obs_data_get_bool(s, "save_txt");
-	gf->save_srt = obs_data_get_bool(s, "save_srt_file");
+	{
+		const char *tp = obs_data_get_string(s, "txt_file_path");
+		gf->txt_file_path = (tp && *tp) ? tp : "";
+		const char *sp = obs_data_get_string(s, "srt_file_path");
+		gf->srt_file_path = (sp && *sp) ? sp : "";
+	}
 	gf->auto_srt_with_recording = obs_data_get_bool(s, "auto_srt_with_recording");
 	gf->file_context_words = (int)obs_data_get_int(s, "file_context_words");
 	if (gf->file_context_words <= 0)
 		gf->file_context_words = 50;
-	{
-		const char *dir_cstr = obs_data_get_string(s, "subtitle_output_dir");
-		std::string dir = (dir_cstr && *dir_cstr) ? dir_cstr : "";
-		if (!dir.empty() && gf->save_to_file) {
-			// Derive .txt path — use custom filename if provided
-			const char *name_cstr = obs_data_get_string(s, "txt_file_name");
-			std::string txt_name = (name_cstr && *name_cstr) ? name_cstr : "captions.txt";
-			if (txt_name.find('.') == std::string::npos)
-				txt_name += ".txt";
-			gf->txt_file_path = dir + "/" + txt_name;
-			gf->srt_file_path = dir + "/captions.srt";
-			gf->output_file_path = gf->srt_file_path; // base for auto-SRT naming
-		} else {
-			gf->txt_file_path = "";
-			gf->srt_file_path = "";
-		}
-	}
 	// Get the current timestamp using the system clock
 	gf->start_timestamp_ms = now_ms();
 	gf->sentence_number = 1;
@@ -501,6 +491,15 @@ void transcription_filter_update(void *data, obs_data_t *s)
 		gf->filter_words_replace.clear();
 	}
 
+	if (gf->save_to_file) {
+		gf->output_file_path = "";
+		const char *output_file_path = obs_data_get_string(s, "subtitle_output_filename");
+		if (output_file_path != nullptr && strlen(output_file_path) > 0) {
+			gf->output_file_path = output_file_path;
+		} else {
+			obs_log(gf->log_level, "output file path is empty, but selected to save");
+		}
+	}
 
 	if (new_buffered_output) {
 		obs_log(gf->log_level, "buffered_output enable");
@@ -813,10 +812,11 @@ void *transcription_filter_create(obs_data_t *settings, obs_source_t *filter)
 	gf->max_sub_duration = (int)obs_data_get_int(settings, "max_sub_duration");
 	gf->last_sub_render_time = now_ms();
 	gf->log_level = (int)obs_data_get_int(settings, "log_level");
-	gf->save_srt = obs_data_get_bool(settings, "save_srt_file");
-	gf->truncate_output_file = false;
+	gf->save_srt = obs_data_get_bool(settings, "subtitle_save_srt");
+	gf->truncate_output_file = obs_data_get_bool(settings, "truncate_output_file");
 	gf->save_only_while_recording = obs_data_get_bool(settings, "only_while_recording");
-	gf->rename_file_to_match_recording = false;
+	gf->rename_file_to_match_recording =
+		obs_data_get_bool(settings, "rename_file_to_match_recording");
 	gf->process_while_muted = obs_data_get_bool(settings, "process_while_muted");
 	gf->buffered_output = obs_data_get_bool(settings, "buffered_output");
 	gf->initial_creation = true;
