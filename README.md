@@ -320,30 +320,6 @@ Adjust the version numbers to match what you actually have in `/usr/lib64/`.
 
 You missed one of the required flags. Wipe the build dir and start step 4 again with all three flags set.
 
-**AMD GPU not used for inference (RX 6700 XT and similar RDNA2 cards)**
-
-Some AMD GPUs are not in ROCm's official support matrix but work correctly with a GFX version override. Without it, the ROCm/HIP runtime will not recognise the GPU and whisper.cpp will silently fall back to CPU for all inference.
-
-This variable must be present in the environment **whenever any ROCm ML workload runs** — including the whisper.cpp inference inside the plugin. The simplest way to guarantee this is to set it system-wide:
-
-```sh
-# Add to /etc/environment (applies to all users and all processes at login)
-echo "HSA_OVERRIDE_GFX_VERSION=10.3.0" | sudo tee -a /etc/environment
-```
-
-Or per-user in your shell profile (`~/.bashrc`, `~/.zshrc`, `~/.profile`):
-
-```sh
-echo 'export HSA_OVERRIDE_GFX_VERSION=10.3.0' >> ~/.bashrc
-source ~/.bashrc
-```
-
-Log out and back in after editing `/etc/environment` for it to take effect system-wide. You can verify ROCm sees your GPU with:
-
-```sh
-HSA_OVERRIDE_GFX_VERSION=10.3.0 rocminfo | grep "Name:"
-```
-
 ---
 
 ### macOS and Windows (untested)
@@ -562,3 +538,11 @@ To build with cuda add `ACCELERATION` as an environment variable (with `cpu`, `h
   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=locaal-ai/obs-localvocal&type=Date" />
   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=locaal-ai/obs-localvocal&type=Date" />
 </picture>
+
+---
+
+## General AI / ROCm Tips
+
+A collection of environment variables and tweaks that are useful when running local AI workloads on AMD GPUs with ROCm, gathered from real-world testing.
+
+**`HSA_OVERRIDE_GFX_VERSION=10.3.0`** — Some AMD GPUs (e.g. RX 6700 XT / RDNA2) are not on ROCm's official support list but work correctly when you tell ROCm which GFX architecture to treat them as. Without this, ROCm silently ignores the GPU and falls back to CPU. Set it persistently in your environment (`~/.bashrc` or `/etc/environment`) so it applies to any ML workload, not just this plugin.
