@@ -155,7 +155,7 @@ void send_sentence_to_cloud_translation_async(const std::string &sentence,
 
 void send_sentence_to_file(struct transcription_filter_data *gf,
 			   const DetectionResultWithText &result, const std::string &sentence,
-			   const std::string &file_path, bool bump_sentence_number)
+			   const std::string &file_path, bool write_as_srt, bool bump_sentence_number)
 {
 	// Check if we should save the sentence
 	if (gf->save_only_while_recording && !obs_frontend_recording_active()) {
@@ -170,7 +170,7 @@ void send_sentence_to_file(struct transcription_filter_data *gf,
 	} else {
 		openmode |= std::ios::app;
 	}
-	if (!gf->save_srt) {
+	if (!write_as_srt) {
 		obs_log(gf->log_level, "Saving sentence '%s' to file %s", sentence.c_str(),
 			gf->output_file_path.c_str());
 		// Write raw sentence to text file (non-srt format)
@@ -240,7 +240,8 @@ void send_translated_sentence_to_file(struct transcription_filter_data *gf,
 		std::string file_name =
 			output_file_path.substr(0, output_file_path.find_last_of("."));
 		translated_file_path = file_name + "_" + target_lang + "." + file_extension;
-		send_sentence_to_file(gf, result, translated_sentence, translated_file_path, false);
+		send_sentence_to_file(gf, result, translated_sentence, translated_file_path,
+				      gf->save_srt, false);
 	}
 }
 
@@ -385,27 +386,19 @@ void output_text(struct transcription_filter_data *gf, const DetectionResultWith
 				gf->sentence_context_buffer =
 					(remainder != std::string::npos) ? buf.substr(remainder) : "";
 
-				// Write to .txt file.
-				if (gf->save_txt && !gf->txt_file_path.empty()) {
-					obs_log(gf->log_level, "-- txt file output -- %s",
-						to_flush.c_str());
-					gf->save_srt = false; // ensure txt mode
-					send_sentence_to_file(gf, result, to_flush,
-							      gf->txt_file_path, false);
-				} else if (gf->save_to_file && !gf->output_file_path.empty() &&
-					   !gf->save_srt) {
-					send_sentence_to_file(gf, result, to_flush,
-							      gf->output_file_path, true);
-				}
-
-				// Write to standalone .srt file.
-				if (!gf->srt_file_path.empty() && gf->save_srt) {
-					send_sentence_to_file(gf, result, to_flush,
-							      gf->srt_file_path, true);
-				} else if (gf->save_to_file && !gf->output_file_path.empty() &&
-					   gf->save_srt) {
-					send_sentence_to_file(gf, result, to_flush,
-							      gf->output_file_path, true);
+				// Write to output file(s) derived from the configured path.
+				if (gf->save_to_file && !gf->output_file_path.empty()) {
+					auto dot = gf->output_file_path.rfind('.');
+					const std::string stem =
+						(dot != std::string::npos)
+							? gf->output_file_path.substr(0, dot)
+							: gf->output_file_path;
+					if (gf->save_txt)
+						send_sentence_to_file(gf, result, to_flush,
+								      stem + ".txt", false, false);
+					if (gf->save_srt)
+						send_sentence_to_file(gf, result, to_flush,
+								      stem + ".srt", true, true);
 				}
 
 				// Write to auto-SRT if recording and enabled.
@@ -423,15 +416,12 @@ void output_text(struct transcription_filter_data *gf, const DetectionResultWith
 						result.end_timestamp_ms > base
 							? result.end_timestamp_ms - base
 							: 0;
-					bool was_srt = gf->save_srt;
 					size_t was_num = gf->sentence_number;
-					gf->save_srt = true;
 					gf->sentence_number = gf->auto_srt_sentence_number;
 					send_sentence_to_file(gf, rec_result, to_flush,
-							      gf->auto_srt_file_path, true);
+							      gf->auto_srt_file_path, true, true);
 					gf->auto_srt_sentence_number = gf->sentence_number;
 					gf->sentence_number = was_num;
-					gf->save_srt = was_srt;
 				}
 			}
 		}

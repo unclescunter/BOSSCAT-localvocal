@@ -395,19 +395,16 @@ void transcription_filter_update(void *data, obs_data_t *s)
 	}
 #endif
 	gf->save_to_file = obs_data_get_bool(s, "file_output_enable");
-	gf->save_srt = obs_data_get_bool(s, "subtitle_save_srt");
+	{
+		const char *fmt = obs_data_get_string(s, "output_format");
+		const std::string fmtStr = (fmt && *fmt) ? fmt : "srt";
+		gf->save_srt = (fmtStr != "txt");
+		gf->save_txt = (fmtStr != "srt");
+	}
 	gf->truncate_output_file = obs_data_get_bool(s, "truncate_output_file");
 	gf->save_only_while_recording = obs_data_get_bool(s, "only_while_recording");
 	gf->rename_file_to_match_recording =
 		obs_data_get_bool(s, "rename_file_to_match_recording");
-	// BOSSCAT Layer 5 — sentence-buffered file output
-	gf->save_txt = obs_data_get_bool(s, "save_txt");
-	{
-		const char *tp = obs_data_get_string(s, "txt_file_path");
-		gf->txt_file_path = (tp && *tp) ? tp : "";
-		const char *sp = obs_data_get_string(s, "srt_file_path");
-		gf->srt_file_path = (sp && *sp) ? sp : "";
-	}
 	gf->auto_srt_with_recording = obs_data_get_bool(s, "auto_srt_with_recording");
 	gf->file_context_words = (int)obs_data_get_int(s, "file_context_words");
 	if (gf->file_context_words <= 0)
@@ -812,7 +809,12 @@ void *transcription_filter_create(obs_data_t *settings, obs_source_t *filter)
 	gf->max_sub_duration = (int)obs_data_get_int(settings, "max_sub_duration");
 	gf->last_sub_render_time = now_ms();
 	gf->log_level = (int)obs_data_get_int(settings, "log_level");
-	gf->save_srt = obs_data_get_bool(settings, "subtitle_save_srt");
+	{
+		const char *fmt = obs_data_get_string(settings, "output_format");
+		const std::string fmtStr = (fmt && *fmt) ? fmt : "srt";
+		gf->save_srt = (fmtStr != "txt");
+		gf->save_txt = (fmtStr != "srt");
+	}
 	gf->truncate_output_file = obs_data_get_bool(settings, "truncate_output_file");
 	gf->save_only_while_recording = obs_data_get_bool(settings, "only_while_recording");
 	gf->rename_file_to_match_recording =

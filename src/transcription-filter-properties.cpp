@@ -116,8 +116,9 @@ bool file_output_select_changed(obs_properties_t *props, obs_property_t *propert
 	UNUSED_PARAMETER(property);
 	const bool show_hide = obs_data_get_bool(settings, "file_output_enable");
 	for (const std::string &prop_name :
-	     {"subtitle_output_filename", "subtitle_save_srt", "truncate_output_file",
-	      "only_while_recording", "rename_file_to_match_recording", "file_output_info"}) {
+	     {"subtitle_output_filename", "auto_srt_with_recording",
+	      "rename_file_to_match_recording", "output_format",
+	      "truncate_output_file", "only_while_recording", "file_context_words"}) {
 		obs_property_set_visible(obs_properties_get(props, prop_name.c_str()), show_hide);
 	}
 	return true;
@@ -457,24 +458,22 @@ void add_file_output_group_properties(obs_properties_t *ppts)
 					 OBS_GROUP_CHECKABLE, file_output_group);
 
 	obs_properties_add_path(file_output_group, "subtitle_output_filename",
-				MT_("output_filename"), OBS_PATH_FILE_SAVE, "Text (*.txt)", NULL);
-	obs_properties_add_text(file_output_group, "file_output_info", MT_("file_output_info"),
-				OBS_TEXT_INFO);
-	obs_properties_add_bool(file_output_group, "subtitle_save_srt", MT_("save_srt"));
+				MT_("output_filename"), OBS_PATH_FILE_SAVE, "Captions (*.srt *.txt)",
+				NULL);
+	obs_properties_add_bool(file_output_group, "auto_srt_with_recording",
+				MT_("auto_srt_with_recording"));
+	obs_properties_add_bool(file_output_group, "rename_file_to_match_recording",
+				MT_("rename_file_to_match_recording"));
+	obs_property_t *fmt_prop =
+		obs_properties_add_list(file_output_group, "output_format", MT_("output_format"),
+					OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
+	obs_property_list_add_string(fmt_prop, MT_("output_format_srt"), "srt");
+	obs_property_list_add_string(fmt_prop, MT_("output_format_txt"), "txt");
+	obs_property_list_add_string(fmt_prop, MT_("output_format_both"), "both");
 	obs_properties_add_bool(file_output_group, "truncate_output_file",
 				MT_("truncate_output_file"));
 	obs_properties_add_bool(file_output_group, "only_while_recording",
 				MT_("only_while_recording"));
-	obs_properties_add_bool(file_output_group, "rename_file_to_match_recording",
-				MT_("rename_file_to_match_recording"));
-	// BOSSCAT Layer 5 — sentence-buffered and per-recording SRT
-	obs_properties_add_bool(file_output_group, "save_txt", MT_("save_txt"));
-	obs_properties_add_path(file_output_group, "txt_file_path", MT_("txt_file_path"),
-				OBS_PATH_FILE_SAVE, "Text (*.txt)", NULL);
-	obs_properties_add_path(file_output_group, "srt_file_path", MT_("srt_file_path"),
-				OBS_PATH_FILE_SAVE, "SRT (*.srt)", NULL);
-	obs_properties_add_bool(file_output_group, "auto_srt_with_recording",
-				MT_("auto_srt_with_recording"));
 	obs_properties_add_int_slider(file_output_group, "file_context_words",
 				      MT_("file_context_words"), 5, 200, 5);
 	obs_property_set_modified_callback(file_output_group_prop, file_output_select_changed);
@@ -717,9 +716,7 @@ void transcription_filter_defaults(obs_data_t *s)
 	obs_data_set_default_int(s, "buffer_output_type",
 				 (int)TokenBufferSegmentation::SEGMENTATION_WORD);
 	// BOSSCAT Layer 5 defaults
-	obs_data_set_default_bool(s, "save_txt", false);
-	obs_data_set_default_string(s, "txt_file_path", "");
-	obs_data_set_default_string(s, "srt_file_path", "");
+	obs_data_set_default_string(s, "output_format", "srt");
 	obs_data_set_default_bool(s, "auto_srt_with_recording", false);
 	obs_data_set_default_int(s, "file_context_words", 50);
 	// BOSSCAT Layer 2 defaults
