@@ -17,6 +17,7 @@
 !LICENSE
 !README.md
 !install.sh
+!package-deb.sh
 !/vendor
 
 # Exclude lock files

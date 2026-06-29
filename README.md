@@ -295,6 +295,32 @@ Restart OBS. The **BOSSCAT Captions** dock will appear under Docks.
 
 ---
 
+### Packaging a .deb for Ubuntu
+
+> **IMPORTANT:** Build on Ubuntu, not Fedora. Binaries compiled on Fedora link against a newer glibc and a different libobs ABI than Ubuntu packages ship — they will fail to load with `GLIBC_2.4x not found` or missing OBS symbols. Clone this repo on the target Ubuntu machine, build it there, then run the packaging script.
+
+After building on Ubuntu, create the `.deb` with:
+
+```sh
+./package-deb.sh
+```
+
+The script stages all plugin files and dep `.so` files into the package, then creates a `postinst` that copies them into `~/.config/obs-studio/plugins/obs-localvocal/` for the installing user. Install the resulting `.deb` with:
+
+```sh
+sudo dpkg -i release/obs-localvocal-bosscat_0.6.2-bosscat1_amd64.deb
+```
+
+Remove with:
+
+```sh
+sudo dpkg -r obs-localvocal-bosscat
+```
+
+> Note: `sudo dpkg -i` installs to the home directory of the user who ran sudo (detected via `$SUDO_USER`). If the user cannot be determined, the script will print the path for a manual copy from `/usr/lib/obs-localvocal-bosscat/`.
+
+---
+
 ### Troubleshooting (Linux)
 
 **OBS says "plugin failed to load" with no detail**
