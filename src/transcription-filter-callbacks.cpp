@@ -401,10 +401,14 @@ void output_text(struct transcription_filter_data *gf, const DetectionResultWith
 								      stem + ".srt", true, true);
 				}
 
-				// Write to auto-SRT if recording and enabled.
+				// Write to auto-SRT if a recording session file is open.
+				// Do NOT gate on obs_frontend_recording_active(): whisper's
+				// processing latency means sentences often arrive after
+				// RECORDING_STOPPING, but the file path is only set between
+				// RECORDING_STARTED and RECORDING_STOPPED, so it is the
+				// correct guard.
 				if (gf->auto_srt_with_recording &&
-				    !gf->auto_srt_file_path.empty() &&
-				    obs_frontend_recording_active()) {
+				    !gf->auto_srt_file_path.empty()) {
 					// Zero timecodes to recording start.
 					DetectionResultWithText rec_result = result;
 					uint64_t base = gf->recording_start_ts;
@@ -812,6 +816,23 @@ void recording_state_callback(enum obs_frontend_event event, void *data)
 		remove_webvtt_output(*gf_,
 				     OBSOutputAutoRelease{obs_frontend_get_recording_output()});
 #endif
+		// Flush any partial sentence still in the buffer to the auto-SRT file.
+		if (gf_->auto_srt_with_recording && !gf_->auto_srt_file_path.empty() &&
+		    !gf_->sentence_context_buffer.empty()) {
+			DetectionResultWithText flush_result;
+			flush_result.result = DETECTION_RESULT_SPEECH;
+			flush_result.start_timestamp_ms = 0;
+			flush_result.end_timestamp_ms = now_ms() > gf_->recording_start_ts
+							     ? now_ms() - gf_->recording_start_ts
+							     : 0;
+			size_t was_num = gf_->sentence_number;
+			gf_->sentence_number = gf_->auto_srt_sentence_number;
+			send_sentence_to_file(gf_, flush_result, gf_->sentence_context_buffer,
+					      gf_->auto_srt_file_path, true, true);
+			gf_->auto_srt_sentence_number = gf_->sentence_number;
+			gf_->sentence_number = was_num;
+			gf_->sentence_context_buffer.clear();
+		}
 	} else if (event == OBS_FRONTEND_EVENT_RECORDING_STOPPED) {
 		// BOSSCAT Layer 5 — rename auto-SRT to match the final recording filename.
 		if (gf_->auto_srt_with_recording && !gf_->auto_srt_file_path.empty()) {
