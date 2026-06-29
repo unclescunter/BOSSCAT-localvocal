@@ -159,11 +159,36 @@ private:
 
 // ---------------------------------------------------------------------------
 // OBS frontend event callback
+// Dock creation is deferred to OBS_FRONTEND_EVENT_FINISHED_LOADING.
+// obs_module_load fires before the main window is fully shown — calling
+// addDockWidget at that point produces a dock that never appears.
 // ---------------------------------------------------------------------------
 static QPointer<CaptionContentWidget> g_content;
 
 static void frontend_event_cb(enum obs_frontend_event event, void * /*data*/)
 {
+	if (event == OBS_FRONTEND_EVENT_FINISHED_LOADING) {
+		auto *main_window =
+			static_cast<QMainWindow *>(obs_frontend_get_main_window());
+		if (!main_window) {
+			obs_log(LOG_WARNING,
+				"caption_dock: no main window at FINISHED_LOADING");
+			return;
+		}
+
+		g_content = new CaptionContentWidget(nullptr);
+
+		auto *dock = new QDockWidget(
+			obs_module_text("caption_dock_title"), main_window);
+		dock->setObjectName("BosscatCaptionDock");
+		dock->setWidget(g_content);
+		dock->setAllowedAreas(Qt::AllDockWidgetAreas);
+		main_window->addDockWidget(Qt::RightDockWidgetArea, dock);
+		dock->show();
+
+		obs_log(LOG_INFO, "BOSSCAT caption dock initialized");
+	}
+
 	if (event == OBS_FRONTEND_EVENT_SCENE_CHANGED && g_content)
 		g_content->refreshCaptions();
 }
@@ -173,27 +198,7 @@ static void frontend_event_cb(enum obs_frontend_event event, void * /*data*/)
 // ---------------------------------------------------------------------------
 void caption_dock_init()
 {
-	auto *main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	if (!main_window) {
-		obs_log(LOG_WARNING, "caption_dock_init: no main window, dock skipped");
-		return;
-	}
-
-	g_content = new CaptionContentWidget(nullptr);
-
-	auto *dock = new QDockWidget(obs_module_text("caption_dock_title"), main_window);
-	dock->setObjectName("BosscatCaptionDock");
-	dock->setWidget(g_content);
-	dock->setAllowedAreas(Qt::AllDockWidgetAreas);
-
-	// Add directly via Qt — bypasses OBS frontend dock APIs which differ
-	// across OBS versions and may start the dock hidden. Qt adds it to
-	// View > Docks automatically and shows it immediately.
-	main_window->addDockWidget(Qt::RightDockWidgetArea, dock);
-	dock->show();
-
 	obs_frontend_add_event_callback(frontend_event_cb, nullptr);
-	obs_log(LOG_INFO, "BOSSCAT caption dock initialized");
 }
 
 void caption_dock_shutdown()
