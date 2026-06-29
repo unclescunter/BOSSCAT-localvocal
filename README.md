@@ -69,10 +69,12 @@ This should Todd Howard now just follow the build instructions.
 - Muting audio sources no longer turns subtitles off, for that use audio source visibility. That should turn it off cleanly
 
 ## Features I think I broke/will fix
-- Local translation with whisper, everything else works maybe this is just how I'm setting it up.
-- Generating .srt files ate absolute doggy doo and idk how I broke it but ideally I would like the option to create a "combined" .srt that has all sources labelled clearly for who is speaking so that it can be added to video later. 
-- Each source should also generate it's own .srt with the label appended.
-- The .srt files should just auto generate so that when you press record or stream, the plugin generates a new .srt
+- Local translation with whisper, other models work maybe this is just how I'm setting it up. I think whisper specifically needs to write to a different file then translate it after or I just don't have the language model I'm trying to train in etc this needs diagnosing.
+- Generated .srt files are absolute doggy doo and idk how I broke it but ideally I would like the option to create a "combined" .srt that has all sources labelled clearly for who is speaking and their sentences correctly concatenated so that it can be added to video later. The dock actually outputs almost the EXACT output that I want I just need to find a way to write that to an .srt file.
+- Each source should be able to generate it's own .srt with the label appended, normal obs naming structure is YYYY-MM-DD\ HH-MM-SS. The source should append it's label if it has chosen to record a separate .srt
+- The .srt files should auto generate with the naming prefix so that when you press record or stream, the plugin generates a new .srt
+- The dock "BOSSCAT Captions" spawns perfectly, works perfectly, does exactly what I want it to but, if you close it, you can't get it back because it isn't in the docks dropdown menu.
+- Sort the gui menu elements out properly into "simple" and "advanced" and rearrange the menu to reflect the real categories everything should be in.
 
 ### Available Versions
 
