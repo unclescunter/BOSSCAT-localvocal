@@ -16,6 +16,7 @@
 #include <filesystem>
 
 #include "transcription-filter-callbacks.h"
+#include "caption-dock.h"
 #include "transcription-utils.h"
 #include "translation/translation.h"
 #include "translation/translation-includes.h"
@@ -327,6 +328,12 @@ void output_text(struct transcription_filter_data *gf, const DetectionResultWith
 				send_caption_to_stream(result, text, gf);
 			}
 		}
+
+		// BOSSCAT Layer 6 — push caption to dock preview regardless of buffered mode.
+		// Only for the primary (non-translated) output so the dock shows source language.
+		if (translation_type == NO_TRANSLATION)
+			caption_dock_update(gf, text, gf->caption_label_text,
+					    gf->caption_label_enabled);
 
 		// BOSSCAT Layer 5 — sentence-buffered file output.
 		// Only finalized (non-partial) speech results are written to file.

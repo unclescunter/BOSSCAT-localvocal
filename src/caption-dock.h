@@ -11,18 +11,27 @@ struct transcription_filter_data;
 
 // ---------------------------------------------------------------------------
 // Global filter registry — each active filter instance registers here so the
-// dock can find the current emitted caption without re-formatting.
+// dock can display the latest caption without holding a gf pointer after
+// the lock is released.
 // ---------------------------------------------------------------------------
 
 struct CaptionFilterEntry {
-	transcription_filter_data *gf;
-	std::string host_source_name; // obs_source_get_name(obs_filter_get_parent())
+	transcription_filter_data *gf; // identity only — never deref outside registry lock
+	std::string host_source_name;
+	std::string last_caption; // latest text, written under g_registry_mutex
+	std::string label;        // display label for this source
+	bool label_enabled = false;
 };
 
 // Register / unregister called from transcription_filter_create / _destroy.
 void caption_registry_add(transcription_filter_data *gf,
 			  const std::string &host_source_name);
 void caption_registry_remove(transcription_filter_data *gf);
+
+// Called from output_text() (NO_TRANSLATION path) to push the latest caption
+// into the registry so the dock can read it safely.
+void caption_dock_update(transcription_filter_data *gf, const std::string &caption,
+			 const std::string &label, bool label_enabled);
 
 // Called once from transcription-filter.cpp after obs_module_load.
 void caption_dock_init();
