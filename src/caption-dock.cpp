@@ -181,17 +181,16 @@ void caption_dock_init()
 
 	g_content = new CaptionContentWidget(nullptr);
 
-	// Wrap in a real QDockWidget so OBS can dock it to any edge of the main
-	// window. obs_frontend_add_custom_qdock registers it with OBS's dock
-	// manager (saves position/state across sessions) and adds it to the
-	// main window. obs_frontend_add_dock_by_id creates a non-dockable
-	// extra-panel tab instead — that is NOT what we want here.
 	auto *dock = new QDockWidget(obs_module_text("caption_dock_title"), main_window);
 	dock->setObjectName("BosscatCaptionDock");
 	dock->setWidget(g_content);
 	dock->setAllowedAreas(Qt::AllDockWidgetAreas);
 
-	obs_frontend_add_custom_qdock("BosscatCaptionDock", dock);
+	// Add directly via Qt — bypasses OBS frontend dock APIs which differ
+	// across OBS versions and may start the dock hidden. Qt adds it to
+	// View > Docks automatically and shows it immediately.
+	main_window->addDockWidget(Qt::RightDockWidgetArea, dock);
+	dock->show();
 
 	obs_frontend_add_event_callback(frontend_event_cb, nullptr);
 	obs_log(LOG_INFO, "BOSSCAT caption dock initialized");
