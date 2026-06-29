@@ -231,26 +231,66 @@ cp -r release/share/obs/obs-plugins/obs-localvocal/. \
 The resulting layout should look like:
 ```
 ~/.config/obs-studio/plugins/obs-localvocal/
-├── bin/64bit/
-│   ├── obs-localvocal.so
-│   └── obs-localvocal/
-│       ├── libggml.so
-│       ├── libggml-base.so
-│       ├── libggml-blas.so
-│       ├── libggml-hip.so
-│       ├── libggml-vulkan.so
-│       ├── libggml-opencl.so
-│       ├── libggml-cpu-*.so  (one per CPU variant)
-│       ├── libonnxruntime_providers_shared.so
-│       ├── libonnxruntime.so -> libonnxruntime.so.1
-│       ├── libonnxruntime.so.1 -> libonnxruntime.so.1.20.1
-│       ├── libonnxruntime.so.1.20.1
-│       ├── libwhisper.so -> libwhisper.so.1
-│       ├── libwhisper.so.1 -> libwhisper.so.1.8.2
-│       └── libwhisper.so.1.8.2
-└── data/
-    ├── locale/
-    └── models/
+├── bin
+│   └── 64bit
+│       ├── obs-localvocal
+│       │   ├── libggml-base.so
+│       │   ├── libggml-blas.so
+│       │   ├── libggml-cpu-alderlake.so
+│       │   ├── libggml-cpu-haswell.so
+│       │   ├── libggml-cpu-icelake.so
+│       │   ├── libggml-cpu-sandybridge.so
+│       │   ├── libggml-cpu-sapphirerapids.so
+│       │   ├── libggml-cpu-skylakex.so
+│       │   ├── libggml-cpu-sse42.so
+│       │   ├── libggml-cpu-x64.so
+│       │   ├── libggml-hip.so
+│       │   ├── libggml-opencl.so
+│       │   ├── libggml.so
+│       │   ├── libggml-vulkan.so
+│       │   ├── libonnxruntime_providers_shared.so
+│       │   ├── libonnxruntime.so -> libonnxruntime.so.1
+│       │   ├── libonnxruntime.so.1 -> libonnxruntime.so.1.20.1
+│       │   ├── libonnxruntime.so.1.20.1
+│       │   ├── libwhisper.so -> libwhisper.so.1
+│       │   ├── libwhisper.so.1 -> libwhisper.so.1.8.2
+│       │   └── libwhisper.so.1.8.2
+│       └── obs-localvocal.so
+└── data
+    ├── locale
+    │   ├── ar-SA.ini
+    │   ├── de-DE.ini
+    │   ├── en-GB.ini
+    │   ├── en-US.ini
+    │   ├── es-ES.ini
+    │   ├── fr-FR.ini
+    │   ├── hi-IN.ini
+    │   ├── ja-JP.ini
+    │   ├── ko-KR.ini
+    │   ├── locale
+    │   │   ├── ar-SA.ini
+    │   │   ├── de-DE.ini
+    │   │   ├── en-GB.ini
+    │   │   ├── en-US.ini
+    │   │   ├── es-ES.ini
+    │   │   ├── fr-FR.ini
+    │   │   ├── hi-IN.ini
+    │   │   ├── ja-JP.ini
+    │   │   ├── ko-KR.ini
+    │   │   ├── pl-PL.ini
+    │   │   ├── pt-BR.ini
+    │   │   ├── ru-RU.ini
+    │   │   └── zh-CN.ini
+    │   ├── pl-PL.ini
+    │   ├── pt-BR.ini
+    │   ├── ru-RU.ini
+    │   └── zh-CN.ini
+    └── models
+        ├── ggml-model-whisper-tiny-en
+        │   └── ggml-model-whisper-tiny.en.bin
+        ├── models_directory.json
+        └── silero-vad
+            └── silero_vad.onnx
 ```
 
 Restart OBS. The **BOSSCAT Captions** dock will appear under Docks. It currently spawns on the right side of the window, you can move it but it does spawn there every time. I'll change that but for the moment that's how it works.
