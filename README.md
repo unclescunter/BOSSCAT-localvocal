@@ -320,6 +320,25 @@ Adjust the version numbers to match what you actually have in `/usr/lib64/`.
 
 You missed one of the required flags. Wipe the build dir and start step 4 again with all three flags set.
 
+**AMD GPU not detected / ROCm inference not working (RX 6700 XT and similar)**
+
+Some AMD GPUs (e.g. RX 6700 XT / RDNA2) are not officially listed in ROCm's support matrix but work fine with a GFX version override. Set this environment variable **before launching OBS**:
+
+```sh
+export HSA_OVERRIDE_GFX_VERSION=10.3.0
+QT_QPA_PLATFORM=xcb obs
+```
+
+To make it permanent, add the export to your shell profile (`~/.bashrc`, `~/.zshrc`, etc.) or create a small launcher script:
+
+```sh
+#!/usr/bin/env bash
+export HSA_OVERRIDE_GFX_VERSION=10.3.0
+exec obs "$@"
+```
+
+Without this, ROCm will not recognise the GPU and inference will silently fall back to CPU.
+
 ---
 
 ### macOS and Windows (untested)

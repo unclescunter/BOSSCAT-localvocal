@@ -47,5 +47,10 @@ cp -r "$RELEASE_DIR/share/obs/obs-plugins/obs-localvocal/." \
    "$OBS_PLUGIN_DIR/data/"
 
 echo "Done. Restart OBS to load the plugin."
+echo ""
+echo "AMD GPU users (RX 6700 XT and similar RDNA2 cards):"
+echo "  If ROCm does not detect your GPU, launch OBS with:"
+echo "  HSA_OVERRIDE_GFX_VERSION=10.3.0 obs"
+echo ""
 echo "If OBS reports a load failure, run:  QT_QPA_PLATFORM=xcb obs"
 echo "to see the real error in the terminal."
