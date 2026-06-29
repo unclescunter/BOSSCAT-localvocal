@@ -22,15 +22,27 @@ fi
 
 echo "Installing to $OBS_PLUGIN_DIR ..."
 
+DEPS_DIR="$OBS_PLUGIN_DIR/bin/64bit/obs-localvocal"
+
 mkdir -p "$OBS_PLUGIN_DIR/bin/64bit"
 mkdir -p "$OBS_PLUGIN_DIR/data"
 
+# Main plugin .so
 cp "$RELEASE_DIR/lib64/obs-plugins/obs-localvocal.so" \
    "$OBS_PLUGIN_DIR/bin/64bit/"
 
-cp -r "$RELEASE_DIR/lib64/obs-plugins/obs-localvocal" \
-   "$OBS_PLUGIN_DIR/bin/64bit/"
+# Dependency libraries in named subdirectory
+cp -r "$RELEASE_DIR/lib64/obs-plugins/obs-localvocal/." \
+   "$DEPS_DIR/"
 
+# Symlink chains required for the versioned .so files to be found at load time
+(cd "$DEPS_DIR" && \
+  ln -sf libonnxruntime.so.1.20.1 libonnxruntime.so.1 && \
+  ln -sf libonnxruntime.so.1      libonnxruntime.so   && \
+  ln -sf libwhisper.so.1.8.2      libwhisper.so.1     && \
+  ln -sf libwhisper.so.1          libwhisper.so)
+
+# Data files (locale, models)
 cp -r "$RELEASE_DIR/share/obs/obs-plugins/obs-localvocal/." \
    "$OBS_PLUGIN_DIR/data/"
 

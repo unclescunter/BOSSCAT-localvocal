@@ -273,10 +273,19 @@ The resulting layout should look like:
 │   ├── obs-localvocal.so
 │   └── obs-localvocal/
 │       ├── libggml.so
+│       ├── libggml-base.so
+│       ├── libggml-blas.so
 │       ├── libggml-hip.so
-│       ├── libwhisper.so.x.x.x
-│       ├── libonnxruntime.so.x.x.x
-│       └── ...
+│       ├── libggml-vulkan.so
+│       ├── libggml-opencl.so
+│       ├── libggml-cpu-*.so  (one per CPU variant)
+│       ├── libonnxruntime_providers_shared.so
+│       ├── libonnxruntime.so -> libonnxruntime.so.1
+│       ├── libonnxruntime.so.1 -> libonnxruntime.so.1.20.1
+│       ├── libonnxruntime.so.1.20.1
+│       ├── libwhisper.so -> libwhisper.so.1
+│       ├── libwhisper.so.1 -> libwhisper.so.1.8.2
+│       └── libwhisper.so.1.8.2
 └── data/
     ├── locale/
     └── models/
