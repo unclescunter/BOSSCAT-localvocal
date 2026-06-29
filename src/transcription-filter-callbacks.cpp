@@ -874,9 +874,13 @@ void enable_callback(void *data_, calldata_t *cd)
 	bool enable = calldata_bool(cd, "enabled");
 	if (enable) {
 		obs_log(gf_->log_level, "enable_callback: enable");
-		gf_->active = true;
+		// Both filter AND source must be in the program output for captioning.
+		obs_source_t *parent = obs_filter_get_parent(gf_->context);
+		gf_->active = parent ? obs_source_active(parent) : false;
 		reset_caption_state(gf_);
 		update_whisper_model(gf_);
+		if (gf_->active)
+			gf_->wshiper_thread_cv.notify_one();
 	} else {
 		obs_log(gf_->log_level, "enable_callback: disable");
 		gf_->active = false;

@@ -425,6 +425,15 @@ void whisper_loop(void *data)
 			gf->clear_buffers = false;
 		}
 
+		// BOSSCAT — idle when source is not in the program output or filter is
+		// disabled. The model stays loaded for instant resume; inference skips
+		// entirely so GPU/CPU compute is saved.
+		if (!gf->active) {
+			std::unique_lock<std::mutex> lock(gf->whisper_ctx_mutex);
+			gf->wshiper_thread_cv.wait_for(lock, std::chrono::milliseconds(500));
+			continue;
+		}
+
 		if (gf->vad_mode == VAD_MODE_HYBRID) {
 			current_vad_state = hybrid_vad_segmentation(gf, current_vad_state);
 		} else if (gf->vad_mode == VAD_MODE_ACTIVE) {

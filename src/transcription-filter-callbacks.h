@@ -21,6 +21,7 @@ void set_text_callback(struct transcription_filter_data *gf,
 		       const DetectionResultWithText &resultIn);
 
 void clear_current_caption(transcription_filter_data *gf_);
+void reset_caption_state(transcription_filter_data *gf_);
 
 void recording_state_callback(enum obs_frontend_event event, void *data);
 

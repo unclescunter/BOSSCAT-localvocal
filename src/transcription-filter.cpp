@@ -919,7 +919,10 @@ void transcription_filter_activate(void *data)
 	struct transcription_filter_data *gf =
 		static_cast<struct transcription_filter_data *>(data);
 	obs_log(gf->log_level, "filter activated");
-	gf->active = true;
+	// Both source and filter must be active for captioning to occur.
+	gf->active = obs_source_enabled(gf->context);
+	if (gf->active)
+		gf->wshiper_thread_cv.notify_one();
 }
 
 void transcription_filter_deactivate(void *data)
@@ -928,6 +931,10 @@ void transcription_filter_deactivate(void *data)
 		static_cast<struct transcription_filter_data *>(data);
 	obs_log(gf->log_level, "filter deactivated");
 	gf->active = false;
+	// Flush audio buffers and clear on-screen captions immediately.
+	reset_caption_state(gf);
+	// Wake the whisper thread so it enters its idle-sleep path without delay.
+	gf->wshiper_thread_cv.notify_one();
 }
 
 void transcription_filter_show(void *data)
