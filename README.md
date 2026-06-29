@@ -70,6 +70,9 @@ This should Todd Howard now just follow the build instructions.
 
 ## Features I think I broke/will fix
 - Local translation with whisper, everything else works maybe this is just how I'm setting it up.
+- Generating .srt files ate absolute doggy doo and idk how I broke it but ideally I would like the option to create a "combined" .srt that has all sources labelled clearly for who is speaking so that it can be added to video later. 
+- Each source should also generate it's own .srt with the label appended.
+- The .srt files should just auto generate so that when you press record or stream, the plugin generates a new .srt
 
 ### Available Versions
 
