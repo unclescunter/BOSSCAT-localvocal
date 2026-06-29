@@ -19,9 +19,17 @@
 #include <QString>
 #include <QMainWindow>
 
+#include <atomic>
 #include <mutex>
 #include <vector>
 #include <string>
+
+static std::atomic<bool> g_subtitles_muted{false};
+
+bool caption_dock_is_muted()
+{
+	return g_subtitles_muted.load(std::memory_order_relaxed);
+}
 
 // ---------------------------------------------------------------------------
 // Global filter registry
@@ -58,6 +66,7 @@ void caption_dock_update(transcription_filter_data *gf, const std::string &capti
 			entry.last_caption = caption;
 			entry.label = label;
 			entry.label_enabled = label_enabled;
+			entry.text_source_name = gf->text_source_name;
 			break;
 		}
 	}
@@ -78,59 +87,27 @@ static std::vector<std::pair<std::string, std::string>> get_all_captions()
 	return out;
 }
 
-// Returns all registered host source names (for mute toggle).
-static std::vector<std::string> get_all_host_source_names()
+// Clears all known text sources (called once when muting so the last subtitle
+// doesn't linger on screen).
+static void clear_all_text_sources()
 {
-	std::vector<std::string> names;
-	std::lock_guard<std::mutex> lock(g_registry_mutex);
-	for (const auto &entry : g_registry)
-		names.push_back(entry.host_source_name);
-	return names;
-}
-
-// Enable or disable every localvocal filter across all registered sources.
-static void set_all_filters_enabled(bool enabled)
-{
-	for (const auto &src_name : get_all_host_source_names()) {
-		obs_source_t *source = obs_get_source_by_name(src_name.c_str());
-		if (!source)
-			continue;
-		obs_source_enum_filters(
-			source,
-			[](obs_source_t *, obs_source_t *filter, void *data) {
-				const char *id = obs_source_get_id(filter);
-				if (id &&
-				    strcmp(id, "transcription_filter_audio_filter") == 0)
-					obs_source_set_enabled(
-						filter,
-						*static_cast<bool *>(data));
-			},
-			&enabled);
-		obs_source_release(source);
+	std::vector<std::string> text_source_names;
+	{
+		std::lock_guard<std::mutex> lock(g_registry_mutex);
+		for (const auto &entry : g_registry)
+			if (!entry.text_source_name.empty())
+				text_source_names.push_back(entry.text_source_name);
 	}
-}
-
-// Returns true if ALL registered localvocal filters are currently enabled.
-static bool all_filters_enabled()
-{
-	bool all_on = true;
-	for (const auto &src_name : get_all_host_source_names()) {
-		obs_source_t *source = obs_get_source_by_name(src_name.c_str());
-		if (!source)
+	for (const auto &name : text_source_names) {
+		obs_source_t *src = obs_get_source_by_name(name.c_str());
+		if (!src)
 			continue;
-		obs_source_enum_filters(
-			source,
-			[](obs_source_t *, obs_source_t *filter, void *data) {
-				const char *id = obs_source_get_id(filter);
-				if (id &&
-				    strcmp(id, "transcription_filter_audio_filter") == 0 &&
-				    !obs_source_enabled(filter))
-					*static_cast<bool *>(data) = false;
-			},
-			&all_on);
-		obs_source_release(source);
+		obs_data_t *settings = obs_source_get_settings(src);
+		obs_data_set_string(settings, "text", "");
+		obs_source_update(src, settings);
+		obs_data_release(settings);
+		obs_source_release(src);
 	}
-	return all_on;
 }
 
 // ---------------------------------------------------------------------------
@@ -170,6 +147,8 @@ public:
 
 	void refreshCaptions()
 	{
+		if (g_subtitles_muted.load(std::memory_order_relaxed))
+			return; // label already set to "(subtitles muted)"
 		auto rows = get_all_captions();
 		if (rows.empty()) {
 			captionLabel->setText("(no localvocal filters active)");
@@ -185,24 +164,17 @@ public:
 						   : QString::fromStdString(row.second);
 		}
 		captionLabel->setText(text);
-
-		// Keep button state in sync if filters were toggled externally.
-		bool muted = !all_filters_enabled();
-		if (muted != muteButton->isChecked()) {
-			muteButton->blockSignals(true);
-			muteButton->setChecked(muted);
-			updateMuteButtonLabel(muted);
-			muteButton->blockSignals(false);
-		}
 	}
 
 private slots:
 	void onMuteToggled(bool muted)
 	{
-		set_all_filters_enabled(!muted);
+		g_subtitles_muted.store(muted, std::memory_order_relaxed);
 		updateMuteButtonLabel(muted);
-		if (muted)
+		if (muted) {
+			clear_all_text_sources();
 			captionLabel->setText("(subtitles muted)");
+		}
 	}
 
 private:

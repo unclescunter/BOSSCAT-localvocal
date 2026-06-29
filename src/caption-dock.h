@@ -18,9 +18,10 @@ struct transcription_filter_data;
 struct CaptionFilterEntry {
 	transcription_filter_data *gf; // identity only — never deref outside registry lock
 	std::string host_source_name;
-	std::string last_caption; // latest text, written under g_registry_mutex
-	std::string label;        // display label for this source
+	std::string last_caption;    // latest text, written under g_registry_mutex
+	std::string label;
 	bool label_enabled = false;
+	std::string text_source_name; // OBS text source to clear on mute
 };
 
 // Register / unregister called from transcription_filter_create / _destroy.
@@ -32,6 +33,10 @@ void caption_registry_remove(transcription_filter_data *gf);
 // into the registry so the dock can read it safely.
 void caption_dock_update(transcription_filter_data *gf, const std::string &caption,
 			 const std::string &label, bool label_enabled);
+
+// Returns true when the user has muted subtitles from the dock.
+// Checked by send_caption_to_source to suppress output without stopping whisper.
+bool caption_dock_is_muted();
 
 // Called once from transcription-filter.cpp after obs_module_load.
 void caption_dock_init();

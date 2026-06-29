@@ -36,9 +36,11 @@ bool whisper_abort_callback(void *data)
 void send_caption_to_source(const std::string &target_source_name, const std::string &caption,
 			    struct transcription_filter_data *gf)
 {
-	if (target_source_name.empty()) {
+	if (target_source_name.empty())
 		return;
-	}
+	// Empty string is a clear — always allow. Non-empty is suppressed when muted.
+	if (!caption.empty() && caption_dock_is_muted())
+		return;
 	auto target = obs_get_source_by_name(target_source_name.c_str());
 	if (!target) {
 		obs_log(gf->log_level, "text_source target is null");
