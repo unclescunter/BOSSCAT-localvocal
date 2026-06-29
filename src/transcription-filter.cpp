@@ -511,8 +511,7 @@ void transcription_filter_update(void *data, obs_data_t *s)
 				gf,
 				[gf](const std::string &text) {
 					if (gf->buffered_output) {
-						send_caption_to_source(gf->text_source_name, text,
-								       gf);
+						send_caption_to_all_primary_sources(text, gf);
 					}
 				},
 				new_buffer_num_lines, new_buffer_num_chars_per_line,
@@ -561,8 +560,7 @@ void transcription_filter_update(void *data, obs_data_t *s)
 				gf->captions_monitor.setCaptionPresentationCallback(
 					[gf](const std::string &text) {
 						if (gf->buffered_output) {
-							send_caption_to_source(gf->text_source_name,
-									       text, gf);
+							send_caption_to_all_primary_sources(text, gf);
 						}
 					});
 
@@ -702,9 +700,34 @@ void transcription_filter_update(void *data, obs_data_t *s)
 	gf->enable_flash_attn = enable_flash_attn;
 
 	obs_log(gf->log_level, "update text source");
-	// update the text source
+	// update the primary text source
 	text_output_source_update(obs_data_get_string(s, "subtitle_sources"), gf->text_source_name,
 				  gf);
+	// rebuild the fan-out list: primary first, then any additional sources
+	{
+		std::vector<std::string> new_names;
+		if (!gf->text_source_name.empty())
+			new_names.push_back(gf->text_source_name);
+		obs_data_array_t *arr =
+			obs_data_get_array(s, "additional_subtitle_sources");
+		size_t count = arr ? obs_data_array_count(arr) : 0;
+		for (size_t i = 0; i < count; i++) {
+			obs_data_t *item = obs_data_array_item(arr, i);
+			const char *val = obs_data_get_string(item, "value");
+			if (val && *val)
+				new_names.push_back(val);
+			obs_data_release(item);
+		}
+		obs_data_array_release(arr);
+		// clear any sources that have been removed
+		for (const auto &old : gf->text_source_names) {
+			bool still_present = std::find(new_names.begin(), new_names.end(),
+						       old) != new_names.end();
+			if (!still_present)
+				send_caption_to_source(old, "", gf);
+		}
+		gf->text_source_names = std::move(new_names);
+	}
 
 	obs_log(gf->log_level, "update whisper params");
 	{
@@ -848,8 +871,24 @@ void *transcription_filter_create(obs_data_t *settings, obs_source_t *filter)
 		gf->text_source_name = "LocalVocal Subtitles";
 		obs_data_set_string(settings, "subtitle_sources", "LocalVocal Subtitles");
 	} else {
-		// set the text source name
 		gf->text_source_name = subtitle_sources;
+	}
+	// Build the initial fan-out list from primary + additional sources
+	{
+		gf->text_source_names.clear();
+		if (!gf->text_source_name.empty())
+			gf->text_source_names.push_back(gf->text_source_name);
+		obs_data_array_t *arr =
+			obs_data_get_array(settings, "additional_subtitle_sources");
+		size_t count = arr ? obs_data_array_count(arr) : 0;
+		for (size_t i = 0; i < count; i++) {
+			obs_data_t *item = obs_data_array_item(arr, i);
+			const char *val = obs_data_get_string(item, "value");
+			if (val && *val)
+				gf->text_source_names.push_back(val);
+			obs_data_release(item);
+		}
+		obs_data_array_release(arr);
 	}
 	create_obs_text_source_if_needed();
 	obs_log(gf->log_level, "clear paths and whisper context");

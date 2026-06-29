@@ -605,6 +605,11 @@ void add_general_group_properties(obs_properties_t *ppts)
 	// Add text sources
 	obs_enum_sources(add_sources_to_list, subs_output);
 
+	// Additional output destinations — type source names (one per entry)
+	obs_properties_add_editable_list(general_group, "additional_subtitle_sources",
+					 MT_("additional_subtitle_sources"),
+					 OBS_EDITABLE_LIST_TYPE_STRINGS, nullptr, nullptr);
+
 	// Add language selector
 	obs_property_t *whisper_language_select_list =
 		obs_properties_add_list(general_group, "whisper_language_select", MT_("language"),

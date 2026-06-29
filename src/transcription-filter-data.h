@@ -185,8 +185,10 @@ struct transcription_filter_data {
 	int n_context_sentences;
 	std::deque<std::string> last_transcription_sentence;
 
-	// Text source to output the subtitles
+	// Text source to output the subtitles (primary — used for comparisons and as first fan-out target)
 	std::string text_source_name;
+	// All nominated output text sources: primary + any additional ones from "additional_subtitle_sources"
+	std::vector<std::string> text_source_names;
 	// Callback to set the text in the output text source (subtitles)
 	std::function<void(const DetectionResultWithText &result)> setTextCallback;
 	// Output file path to write the subtitles

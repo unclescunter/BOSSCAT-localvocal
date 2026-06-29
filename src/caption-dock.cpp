@@ -66,7 +66,7 @@ void caption_dock_update(transcription_filter_data *gf, const std::string &capti
 			entry.last_caption = caption;
 			entry.label = label;
 			entry.label_enabled = label_enabled;
-			entry.text_source_name = gf->text_source_name;
+			entry.text_source_names = gf->text_source_names;
 			break;
 		}
 	}
@@ -91,14 +91,15 @@ static std::vector<std::pair<std::string, std::string>> get_all_captions()
 // doesn't linger on screen).
 static void clear_all_text_sources()
 {
-	std::vector<std::string> text_source_names;
+	std::vector<std::string> to_clear;
 	{
 		std::lock_guard<std::mutex> lock(g_registry_mutex);
 		for (const auto &entry : g_registry)
-			if (!entry.text_source_name.empty())
-				text_source_names.push_back(entry.text_source_name);
+			for (const auto &name : entry.text_source_names)
+				if (!name.empty())
+					to_clear.push_back(name);
 	}
-	for (const auto &name : text_source_names) {
+	for (const auto &name : to_clear) {
 		obs_source_t *src = obs_get_source_by_name(name.c_str());
 		if (!src)
 			continue;

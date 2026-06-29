@@ -21,7 +21,7 @@ struct CaptionFilterEntry {
 	std::string last_caption;    // latest text, written under g_registry_mutex
 	std::string label;
 	bool label_enabled = false;
-	std::string text_source_name; // OBS text source to clear on mute
+	std::vector<std::string> text_source_names; // OBS text sources to clear on mute
 };
 
 // Register / unregister called from transcription_filter_create / _destroy.

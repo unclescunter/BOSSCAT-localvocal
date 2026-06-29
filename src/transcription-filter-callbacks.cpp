@@ -52,6 +52,20 @@ void send_caption_to_source(const std::string &target_source_name, const std::st
 	obs_source_release(target);
 }
 
+// Sends a caption to the primary source AND all additional nominated sources.
+// Use this whenever output_source == gf->text_source_name so that all scenes
+// with differently-named text boxes receive the same caption.
+void send_caption_to_all_primary_sources(const std::string &caption,
+					  struct transcription_filter_data *gf)
+{
+	if (gf->text_source_names.empty()) {
+		send_caption_to_source(gf->text_source_name, caption, gf);
+		return;
+	}
+	for (const auto &name : gf->text_source_names)
+		send_caption_to_source(name, caption, gf);
+}
+
 void audio_chunk_callback(struct transcription_filter_data *gf, const float *pcm32f_data,
 			  size_t frames, int vad_state, const DetectionResultWithText &result)
 {
@@ -316,10 +330,13 @@ void output_text(struct transcription_filter_data *gf, const DetectionResultWith
 					result.result == DETECTION_RESULT_PARTIAL);
 			}
 		} else {
-			// non-buffered output - send the sentence to the selected source
+			// non-buffered output - send the sentence to the selected source(s)
 			obs_log(LOG_DEBUG, "-- text output to source %s -- %s",
 				output_source.c_str(), text.c_str());
-			send_caption_to_source(output_source, text, gf);
+			if (output_source == gf->text_source_name)
+				send_caption_to_all_primary_sources(text, gf);
+			else
+				send_caption_to_source(output_source, text, gf);
 		}
 
 		if (gf->caption_to_stream && translation_type == NO_TRANSLATION &&
@@ -875,7 +892,7 @@ void clear_current_caption(transcription_filter_data *gf_)
 		gf_->translation_monitor.clear();
 		gf_->cloud_translation_monitor.clear();
 	}
-	send_caption_to_source(gf_->text_source_name, "", gf_);
+	send_caption_to_all_primary_sources("", gf_);
 	send_caption_to_source(gf_->translation_output, "", gf_);
 	send_caption_to_source(gf_->translate_cloud_output, "", gf_);
 	// reset translation context
