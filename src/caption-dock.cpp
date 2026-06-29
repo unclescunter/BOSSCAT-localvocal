@@ -9,7 +9,9 @@
 #include <obs-module.h>
 #include <obs-frontend-api.h>
 
+#include <QDockWidget>
 #include <QLabel>
+#include <QPushButton>
 #include <QVBoxLayout>
 #include <QWidget>
 #include <QPointer>
@@ -47,8 +49,6 @@ void caption_registry_remove(transcription_filter_data *gf)
 			 g_registry.end());
 }
 
-// Called from output_text() to push the latest caption into the registry.
-// Safe to call from any thread.
 void caption_dock_update(transcription_filter_data *gf, const std::string &caption,
 			 const std::string &label, bool label_enabled)
 {
@@ -64,12 +64,7 @@ void caption_dock_update(transcription_filter_data *gf, const std::string &capti
 }
 
 // ---------------------------------------------------------------------------
-// Build a snapshot for the dock.
-// All caption text is copied under the registry lock, so gf is never
-// dereferenced after the lock is released (no use-after-free).
-// All registered filters are shown — global audio sources (Mic/Aux in OBS's
-// audio mixer) never appear as scene items and would be silently dropped by
-// scene-scoped enumeration.
+// Snapshot helpers
 // ---------------------------------------------------------------------------
 static std::vector<std::pair<std::string, std::string>> get_all_captions()
 {
@@ -83,32 +78,44 @@ static std::vector<std::pair<std::string, std::string>> get_all_captions()
 	return out;
 }
 
+// Returns the host source name of the first registered filter (for Settings button).
+static std::string get_first_host_source_name()
+{
+	std::lock_guard<std::mutex> lock(g_registry_mutex);
+	if (!g_registry.empty())
+		return g_registry[0].host_source_name;
+	return "";
+}
+
 // ---------------------------------------------------------------------------
-// The dock content widget.
-// Must be a plain QWidget — obs_frontend_add_dock_by_id wraps it in OBS's
-// own OBSDock (a QDockWidget subclass). Passing a QDockWidget here would
-// nest one dock inside another, breaking popout and title-bar behaviour.
+// Dock content widget
 // ---------------------------------------------------------------------------
-class CaptionDockWidget : public QWidget {
+class CaptionContentWidget : public QWidget {
 public:
-	explicit CaptionDockWidget(QWidget *parent = nullptr) : QWidget(parent)
+	explicit CaptionContentWidget(QWidget *parent = nullptr) : QWidget(parent)
 	{
 		auto *layout = new QVBoxLayout(this);
 		layout->setContentsMargins(4, 4, 4, 4);
-		layout->setSpacing(4);
+		layout->setSpacing(6);
 
 		captionLabel = new QLabel(this);
 		captionLabel->setWordWrap(true);
 		captionLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
 		captionLabel->setTextFormat(Qt::PlainText);
-		captionLabel->setStyleSheet("QLabel { font-size: 14pt; }");
+		captionLabel->setStyleSheet("QLabel { font-size: 13pt; }");
 		captionLabel->setText("(no localvocal filters active)");
+		captionLabel->setMinimumHeight(60);
 
-		layout->addWidget(captionLabel);
-		layout->addStretch();
+		settingsButton = new QPushButton(tr("Filter Settings"), this);
+		connect(settingsButton, &QPushButton::clicked, this,
+			&CaptionContentWidget::openFilterSettings);
+
+		layout->addWidget(captionLabel, 1);
+		layout->addWidget(settingsButton, 0);
 
 		refreshTimer = new QTimer(this);
-		connect(refreshTimer, &QTimer::timeout, this, &CaptionDockWidget::refreshCaptions);
+		connect(refreshTimer, &QTimer::timeout, this,
+			&CaptionContentWidget::refreshCaptions);
 		refreshTimer->start(200);
 	}
 
@@ -125,27 +132,40 @@ public:
 				text += "\n\n";
 			if (!row.first.empty())
 				text += QString::fromStdString(row.first) + ": ";
-			text += row.second.empty() ? "(listening...)"
+			text += row.second.empty() ? tr("(listening...)")
 						   : QString::fromStdString(row.second);
 		}
 		captionLabel->setText(text);
 	}
 
+private slots:
+	void openFilterSettings()
+	{
+		std::string src_name = get_first_host_source_name();
+		if (src_name.empty())
+			return;
+		obs_source_t *src = obs_get_source_by_name(src_name.c_str());
+		if (!src)
+			return;
+		obs_frontend_open_source_filters(src);
+		obs_source_release(src);
+	}
+
 private:
 	QLabel *captionLabel = nullptr;
+	QPushButton *settingsButton = nullptr;
 	QTimer *refreshTimer = nullptr;
 };
 
 // ---------------------------------------------------------------------------
 // OBS frontend event callback
-// QPointer auto-nulls if OBS destroys the widget before we unregister.
 // ---------------------------------------------------------------------------
-static QPointer<CaptionDockWidget> g_dock;
+static QPointer<CaptionContentWidget> g_content;
 
 static void frontend_event_cb(enum obs_frontend_event event, void * /*data*/)
 {
-	if (event == OBS_FRONTEND_EVENT_SCENE_CHANGED && g_dock)
-		g_dock->refreshCaptions();
+	if (event == OBS_FRONTEND_EVENT_SCENE_CHANGED && g_content)
+		g_content->refreshCaptions();
 }
 
 // ---------------------------------------------------------------------------
@@ -153,20 +173,25 @@ static void frontend_event_cb(enum obs_frontend_event event, void * /*data*/)
 // ---------------------------------------------------------------------------
 void caption_dock_init()
 {
-	if (!obs_frontend_get_main_window()) {
+	auto *main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
+	if (!main_window) {
 		obs_log(LOG_WARNING, "caption_dock_init: no main window, dock skipped");
 		return;
 	}
 
-	// No parent — obs_frontend_add_dock_by_id takes ownership and re-parents.
-	g_dock = new CaptionDockWidget(nullptr);
+	g_content = new CaptionContentWidget(nullptr);
 
-	if (!obs_frontend_add_dock_by_id("BosscatCaptionDock",
-					 obs_module_text("caption_dock_title"), g_dock)) {
-		obs_log(LOG_WARNING, "caption_dock_init: obs_frontend_add_dock_by_id failed");
-		g_dock = nullptr;
-		return;
-	}
+	// Wrap in a real QDockWidget so OBS can dock it to any edge of the main
+	// window. obs_frontend_add_custom_qdock registers it with OBS's dock
+	// manager (saves position/state across sessions) and adds it to the
+	// main window. obs_frontend_add_dock_by_id creates a non-dockable
+	// extra-panel tab instead — that is NOT what we want here.
+	auto *dock = new QDockWidget(obs_module_text("caption_dock_title"), main_window);
+	dock->setObjectName("BosscatCaptionDock");
+	dock->setWidget(g_content);
+	dock->setAllowedAreas(Qt::AllDockWidgetAreas);
+
+	obs_frontend_add_custom_qdock("BosscatCaptionDock", dock);
 
 	obs_frontend_add_event_callback(frontend_event_cb, nullptr);
 	obs_log(LOG_INFO, "BOSSCAT caption dock initialized");
@@ -175,5 +200,5 @@ void caption_dock_init()
 void caption_dock_shutdown()
 {
 	obs_frontend_remove_event_callback(frontend_event_cb, nullptr);
-	g_dock = nullptr;
+	g_content = nullptr;
 }
