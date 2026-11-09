@@ -1,13 +1,7 @@
 name: Push to master
 run-name: ${{ github.ref_name }} push run 🚀
 on:
-  push:
-    branches:
-      - master
-      - main
-      - 'release/**'
-    tags:
-      - '*'
+  workflow_dispatch: {}
 permissions:
   contents: write
 concurrency:
