@@ -4,7 +4,7 @@
 
 ## Introduction
 
-LocalVocal - Bosscat flavour is a shameless copy of the original [LocalVocal](https://github.com/royshil/obs-localvocal) which lets you transcribe, locally on your machine, speech into text and (hopefully) simultaneously translate to any language. ✅ No GPU required, ✅ no cloud costs, ✅ no network and ✅ no downtime! Privacy first - all data stays on your machine.
+LocalVocal - Bosscat flavour is an iteration of the original [LocalVocal](https://github.com/royshil/obs-localvocal) which lets you transcribe, locally on your machine, speech into text and (hopefully) simultaneously translate to any language. ✅ No GPU required, ✅ no cloud costs, ✅ no network and ✅ no downtime! Privacy first - all data stays on your machine.
 
 The plugin had a few limitations on linux and I hada claude subscription, this is all vibe coded "upgrades" so download and run at your own risk. ONLY tested on [Nobara](https://nobaraproject.org/) Linux which is a version of Fedora.
 It should build for you but YMMV.
